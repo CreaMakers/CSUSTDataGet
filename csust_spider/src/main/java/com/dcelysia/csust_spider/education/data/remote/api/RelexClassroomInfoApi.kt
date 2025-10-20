@@ -20,7 +20,7 @@ interface RelexClassroomInfoApi {
      * @param jc2 结束节次（节次的结束值）示例：02
      */
     @FormUrlEncoded
-    @POST("/jsxsd/kbxx/jsjy_query2")
+    @POST("/jsxsd/kbxx/jsjyjl_list")
     suspend fun getRelexClassroom(
         @Field("xnxqh") xnxqh: String,
         @Field("typewhere") typewhere: String = "jszq",
