@@ -6,6 +6,7 @@ import com.dcelysia.csust_spider.core.Resource
 import com.dcelysia.csust_spider.core.RetrofitUtils
 import com.dcelysia.csust_spider.education.data.remote.api.CourseGradeApi
 import com.dcelysia.csust_spider.education.data.remote.api.CourseScheduleApi
+import com.dcelysia.csust_spider.education.data.remote.api.RelexClassroomInfoApi
 import com.dcelysia.csust_spider.education.data.remote.error.EduHelperError
 import com.dcelysia.csust_spider.education.data.remote.model.Course
 import com.dcelysia.csust_spider.education.data.remote.model.CourseGrade
@@ -21,6 +22,7 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import java.lang.Exception
+import kotlin.jvm.java
 
 class EducationRepository private constructor() {
     private val TAG = "EducationRepository"
@@ -31,6 +33,12 @@ class EducationRepository private constructor() {
 
     private val courseScheduleApi by lazy { RetrofitUtils.instanceEduCourse.create(CourseScheduleApi::class.java) }
     private val courseGradeApi by lazy { RetrofitUtils.instanceScoreInquiry.create(CourseGradeApi::class.java) }
+    private val relexClassroomInfoApi by lazy {
+        RetrofitUtils
+            .instanceRelexClassroomInfo.create(
+                RelexClassroomInfoApi::class.java
+            )
+    }
 
     /**
      * Gets course schedule by term and parses it into a List of Course objects
@@ -386,5 +394,57 @@ class EducationRepository private constructor() {
             ?: throw EduHelperError.GradeDetailRetrievalFailed("总成绩格式无效: $totalGradeString")
 
         return GradeDetail(components, totalGrade)
+    }
+
+    /**
+     * Gets classroom information and returns raw HTML string
+     *
+     * @param xnxqh 学期字段，示例："2024-2025-1"
+     * @param xqbh 校区编号，用于指定查询的校区/区域
+     * @param zc 开始周次（查询的起始周）
+     * @param zc2 结束周次（查询的结束周）示例：第一周
+     * @param xq 开始星期，示例：星期一
+     * @param xq2 结束星期，示例：星期二
+     * @param jc 开始节次（节次的起始值）示例：01
+     * @param jc2 结束节次（节次的结束值）示例：02
+     * @return Raw HTML string of the classroom information
+     */
+    suspend fun getRelexClassroom(
+        xnxqh: String,
+        xqbh: String,
+        zc: String,
+        zc2: String,
+        xq: String,
+        xq2: String,
+        jc: String,
+        jc2: String
+    ): Resource<String> {
+        return try {
+            val response = relexClassroomInfoApi.getRelexClassroom(
+                xnxqh = xnxqh,
+                xqbh = xqbh,
+                zc = zc,
+                zc2 = zc2,
+                xq = xq,
+                xq2 = xq2,
+                jc = jc,
+                jc2 = jc2
+            )
+            
+            if (!response.isSuccessful) {
+                return Resource.Error("网络请求失败")
+            }
+            
+            val htmlBody = response.body().toString()
+            Log.d(Companion.TAG, htmlBody)
+            if (response.code() == 200 && htmlBody.contains("用户登录")) {
+                return Resource.Error("需要重新登录")
+            }
+
+            Resource.Success(htmlBody)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching classroom information", e)
+            Resource.Error("发生错误")
+        }
     }
 }

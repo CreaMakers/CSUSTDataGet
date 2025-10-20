@@ -98,4 +98,35 @@ object EducationHelper {
             null
         }
     }
+
+    /**
+     * Gets classroom information and returns raw HTML string
+     *
+     * @param xnxqh 学期字段，示例："2024-2025-1"
+     * @param xqbh 校区编号，用于指定查询的校区/区域
+     * @param zc 开始周次（查询的起始周）
+     * @param zc2 结束周次（查询的结束周）示例：第一周
+     * @param xq 开始星期，示例：星期一
+     * @param xq2 结束星期，示例：星期二
+     * @param jc 开始节次（节次的起始值）示例：01
+     * @param jc2 结束节次（节次的结束值）示例：02
+     * @return Raw HTML string of the classroom information
+     */
+    suspend fun getRelexClassroom(
+        xnxqh: String,
+        xqbh: String,
+        zc: String,
+        zc2: String,
+        xq: String,
+        xq2: String,
+        jc: String,
+        jc2: String
+    ): Resource<String> {
+        return try {
+            repository.getRelexClassroom(xnxqh, xqbh, zc, zc2, xq, xq2, jc, jc2)
+        } catch (e: Exception) {
+            Log.d(TAG, e.toString())
+            Resource.Error("发生错误")
+        }
+    }
 }
