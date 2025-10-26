@@ -184,6 +184,10 @@ class EducationRepository private constructor() {
             )
         }
 
+        if (html.contains("用户登录") || html.contains("统一身份认证")) {
+            return CourseGradeResponse("403", "登录状态已失效，请重新登录", null)
+        }
+
         return try {
             val grades = parseCourseGrades(html)
             CourseGradeResponse("200", "成功", grades)
@@ -330,6 +334,10 @@ class EducationRepository private constructor() {
                 msg = "响应体为空",
                 data = null
             )
+        }
+
+        if (html.contains("用户登录") || html.contains("统一身份认证")) {
+            return GradeDetailResponse("403", "登录状态已失效，请重新登录", null)
         }
 
         return try {
