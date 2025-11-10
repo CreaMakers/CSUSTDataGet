@@ -127,6 +127,14 @@ object RetrofitUtils {
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }
+    val instanceRelexClassroomInfo: Retrofit by lazy {
+        Retrofit.Builder()
+            .baseUrl(EDUCA_LOGIN_URL)
+            .client(EducationClientForService)
+            .addConverterFactory(ScalarsConverterFactory.create())
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
 
     suspend fun ClearClient(client: String){
         when(client){
