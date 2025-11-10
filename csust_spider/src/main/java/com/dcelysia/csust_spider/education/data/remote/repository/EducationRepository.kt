@@ -6,7 +6,6 @@ import com.dcelysia.csust_spider.core.Resource
 import com.dcelysia.csust_spider.core.RetrofitUtils
 import com.dcelysia.csust_spider.education.data.remote.api.CourseGradeApi
 import com.dcelysia.csust_spider.education.data.remote.api.CourseScheduleApi
-import com.dcelysia.csust_spider.education.data.remote.api.RelexClassroomInfoApi
 import com.dcelysia.csust_spider.education.data.remote.error.EduHelperError
 import com.dcelysia.csust_spider.education.data.remote.model.Course
 import com.dcelysia.csust_spider.education.data.remote.model.CourseGrade
@@ -33,12 +32,12 @@ class EducationRepository private constructor() {
 
     private val courseScheduleApi by lazy { RetrofitUtils.instanceEduCourse.create(CourseScheduleApi::class.java) }
     private val courseGradeApi by lazy { RetrofitUtils.instanceScoreInquiry.create(CourseGradeApi::class.java) }
-    private val relexClassroomInfoApi by lazy {
-        RetrofitUtils
-            .instanceRelexClassroomInfo.create(
-                RelexClassroomInfoApi::class.java
-            )
-    }
+//    private val relexClassroomInfoApi by lazy {
+//        RetrofitUtils
+//            .instanceRelexClassroomInfo.create(
+//                RelexClassroomInfoApi::class.java
+//            )
+//    }
 
     /**
      * Gets course schedule by term and parses it into a List of Course objects
