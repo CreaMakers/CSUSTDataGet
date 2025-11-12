@@ -9,6 +9,7 @@ import com.dcelysia.csust_spider.education.data.remote.model.ExamArrange
 import org.jsoup.Jsoup
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
 
 object ExamArrangeService {
 
@@ -16,10 +17,10 @@ object ExamArrangeService {
 
     private val TAG = "Exam_Arrange"
 
-    private val ExamList= ArrayList<ExamArrange>()
 
 
-    suspend fun getExamArrange(Semester: String, SemesterType: String): ArrayList<ExamArrange>? {
+    suspend fun getExamArrange(Semester: String, SemesterType: String): List<ExamArrange>? {
+        val examList = mutableListOf<ExamArrange>()
         if (AuthService.CheckLoginStates()) {
             val querySemester =
                 Semester.ifEmpty {
@@ -62,10 +63,10 @@ object ExamArrangeService {
                         cols[10].text().trim()
                     )
 
-                    ExamList.add(exam)
+                    examList.add(exam)
 
                 }
-                return ExamList
+                return examList
             } else {
                 throw EduHelperError.examScheduleRetrievalFailed("未查询到考试安排表")
             }
@@ -93,7 +94,7 @@ object ExamArrangeService {
             val endDate = LocalDateTime.parse("${list[0]} ${timeList[1]}", dateFormatter)
             Log.d(TAG, "startTime:${startDate},endTime:${endDate}")
             return Pair(startDate, endDate)
-        } catch (e: java.time.format.DateTimeParseException) {
+        } catch (e: DateTimeParseException) {
             throw EduHelperError.TimeParseFailed("字符串转换时间格式异常: ${e.message}")
         }
     }
