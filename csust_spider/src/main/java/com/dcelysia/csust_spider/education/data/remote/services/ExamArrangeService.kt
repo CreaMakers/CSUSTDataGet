@@ -31,7 +31,7 @@ object ExamArrangeService {
 
             val html = Jsoup.parse(body.toString())
 
-            val data = (html.select("#datalist").first())
+            val data = (html.select("#dataList").first())
             if (data != null) {
                 if (data.html().contains("未查询到数据")) {
                     return null
@@ -80,19 +80,22 @@ object ExamArrangeService {
         if (list.size != 2) throw EduHelperError.TimeParseFailed("时间字符串格式无效")
         val timeList = list[1].split("~")
         if (timeList.size != 2) throw EduHelperError.TimeParseFailed("时间段字符串格式无效")
+
         val dateFormatter = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
         } else {
             TODO("VERSION.SDK_INT < O")
         }
-        val startDate = LocalDateTime.parse("${list[0]}+${timeList[0]}", dateFormatter)
-        val endDate = LocalDateTime.parse("${list[0]}+${timeList[1]}", dateFormatter)
-        Log.d(TAG,"startTime:${startDate},endTime:${endDate}")
-        if (startDate.hour == null || endDate.hour == null){
-            throw EduHelperError.TimeParseFailed("字符串转换时间格式异常")
-        }
-        return Pair(startDate,endDate)
 
+        try {
+            // 使用空格连接日期与时间（而不是 '+'）
+            val startDate = LocalDateTime.parse("${list[0]} ${timeList[0]}", dateFormatter)
+            val endDate = LocalDateTime.parse("${list[0]} ${timeList[1]}", dateFormatter)
+            Log.d(TAG, "startTime:${startDate},endTime:${endDate}")
+            return Pair(startDate, endDate)
+        } catch (e: java.time.format.DateTimeParseException) {
+            throw EduHelperError.TimeParseFailed("字符串转换时间格式异常: ${e.message}")
+        }
     }
 
     private suspend fun getSemesterid(SemesterType: String): String {
