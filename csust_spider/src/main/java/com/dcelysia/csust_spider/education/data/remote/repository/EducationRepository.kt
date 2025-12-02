@@ -163,9 +163,6 @@ class EducationRepository private constructor() {
         displayMode: DisplayMode = DisplayMode.BEST_GRADE,
         studyMode: StudyMode = StudyMode.MAJOR
     ): CourseGradeResponse {
-
-        AuthService.CheckLoginStates()
-
         val response = courseGradeApi.getCourseGrades(
             academicYearSemester ?: "", //学年学期，格式为 "2023-2024-1"，如果为 `nil` 则为全部学期
             courseNature?.id ?: "", //课程性质，如果为 `nil` 则查询所有性质的课程
@@ -284,9 +281,6 @@ class EducationRepository private constructor() {
     * - Returns: 包含所有可用学期的数组
     */
     suspend fun getAvailableSemestersForCourseGrades(): List<String> {
-
-        AuthService.CheckLoginStates()
-
         val response = courseGradeApi.getCourseGradePage()
 
         if(!response.isSuccessful) {
@@ -321,9 +315,6 @@ class EducationRepository private constructor() {
     * - Returns: 成绩详情
     */
     suspend fun getGradeDetail(url: String): GradeDetailResponse {
-
-        AuthService.CheckLoginStates()
-
         val response = courseGradeApi.getGradeDetail(url)
 
         if (!response.isSuccessful) {
