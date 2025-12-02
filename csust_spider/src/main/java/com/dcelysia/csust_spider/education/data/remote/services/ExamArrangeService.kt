@@ -7,39 +7,34 @@ import com.dcelysia.csust_spider.core.RetrofitUtils
 import com.dcelysia.csust_spider.education.data.remote.api.ExamApi
 import com.dcelysia.csust_spider.education.data.remote.error.EduHelperError
 import com.dcelysia.csust_spider.education.data.remote.model.ExamArrange
-import org.jsoup.Jsoup
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 import kotlin.collections.get
+import org.jsoup.Jsoup
 
 // 确保你已经有了这个类，或者放在合适的文件中
-
 
 object ExamArrangeService {
 
     private val api by lazy { RetrofitUtils.instanceExam.create(ExamApi::class.java) }
     private const val TAG = "Exam_Arrange"
 
-    /**
-     * 获取考试安排
-     * 注意：Loading 状态建议在 ViewModel 调用此函数前设置
-     */
-    suspend fun getExamArrange(semester: String, semesterType: String): Resource<List<ExamArrange>> {
+    /** 获取考试安排 注意：Loading 状态建议在 ViewModel 调用此函数前设置 */
+    suspend fun getExamArrange(
+            semester: String,
+            semesterType: String
+    ): Resource<List<ExamArrange>> {
         return try {
-            // 1. 检查登录状态
-            if (!AuthService.CheckLoginStates()) {
-                return Resource.Error("未登录，请重新登录")
-            }
-
             // 2. 获取学期信息 (如果在 try 块中抛出异常会被 catch 捕获)
-            val querySemester = semester.ifEmpty {
-                val semesters = getSemesterMessage()
-                if (semesters.isEmpty()) {
-                    return Resource.Error("获取学期信息失败：列表为空")
-                }
-                semesters[0] // 默认取第一个，根据逻辑可能是默认选中的那个
-            }
+            val querySemester =
+                    semester.ifEmpty {
+                        val semesters = getSemesterMessage()
+                        if (semesters.isEmpty()) {
+                            return Resource.Error("获取学期信息失败：列表为空")
+                        }
+                        semesters[0] // 默认取第一个，根据逻辑可能是默认选中的那个
+                    }
 
             // 3. 网络请求
             val semesterId = getSemesterid(semesterType)
@@ -77,7 +72,7 @@ object ExamArrangeService {
             val examList = mutableListOf<ExamArrange>()
 
             list.forEachIndexed { index, row ->
-                if (index == 0) return@forEachIndexed  // 跳过表头
+                if (index == 0) return@forEachIndexed // 跳过表头
 
                 val cols = row.select("td")
                 if (cols.size < 11) {
@@ -86,31 +81,32 @@ object ExamArrangeService {
 
                 // 解析时间
                 val timeString = cols[6].text().trim()
-                val examTimeRange = try {
-                    parseDate(timeString)
-                } catch (e: Exception) {
-                    return Resource.Error("时间解析失败 ($timeString): ${e.message}")
-                }
+                val examTimeRange =
+                        try {
+                            parseDate(timeString)
+                        } catch (e: Exception) {
+                            return Resource.Error("时间解析失败 ($timeString): ${e.message}")
+                        }
 
-                val exam = ExamArrange(
-                    cols[1].text().trim(),
-                    cols[2].text().trim(),
-                    cols[3].text().trim(),
-                    cols[4].text().trim(),
-                    cols[5].text().trim(),
-                    cols[6].text().trim(),
-                    examTimeRange.first,
-                    examTimeRange.second,
-                    cols[7].text().trim(),
-                    cols[8].text().trim(),
-                    cols[9].text().trim(),
-                    cols[10].text().trim()
-                )
+                val exam =
+                        ExamArrange(
+                                cols[1].text().trim(),
+                                cols[2].text().trim(),
+                                cols[3].text().trim(),
+                                cols[4].text().trim(),
+                                cols[5].text().trim(),
+                                cols[6].text().trim(),
+                                examTimeRange.first,
+                                examTimeRange.second,
+                                cols[7].text().trim(),
+                                cols[8].text().trim(),
+                                cols[9].text().trim(),
+                                cols[10].text().trim()
+                        )
                 examList.add(exam)
             }
 
             Resource.Success(examList)
-
         } catch (e: Exception) {
             Log.e(TAG, "getExamArrange error", e)
             // 捕获所有未知异常，防止 App 崩溃
@@ -155,13 +151,15 @@ object ExamArrangeService {
 
     // 获取学期列表
     private suspend fun getSemesterMessage(): ArrayList<String> {
-        val response = api.getExamSemester().body()
-            ?: throw EduHelperError.examScheduleRetrievalFailed("获取学期列表失败：响应为空")
+        val response =
+                api.getExamSemester().body()
+                        ?: throw EduHelperError.examScheduleRetrievalFailed("获取学期列表失败：响应为空")
 
         val document = Jsoup.parse(response.toString())
 
-        val semesters = document.select("#xnxqid").first()
-            ?: throw EduHelperError.examScheduleRetrievalFailed("未找到学期下拉框")
+        val semesters =
+                document.select("#xnxqid").first()
+                        ?: throw EduHelperError.examScheduleRetrievalFailed("未找到学期下拉框")
 
         val options = semesters.select("option")
         val result = ArrayList<String>()
@@ -192,5 +190,3 @@ object ExamArrangeService {
         return result
     }
 }
-
-

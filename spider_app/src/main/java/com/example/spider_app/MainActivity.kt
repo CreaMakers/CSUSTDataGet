@@ -2,6 +2,7 @@ package com.example.spider_app
 
 import android.os.Bundle
 import android.util.Log
+import android.util.Log.w
 import android.widget.Button
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -11,16 +12,14 @@ import com.dcelysia.csust_spider.core.Resource
 import com.dcelysia.csust_spider.core.RetrofitUtils
 import com.dcelysia.csust_spider.education.data.remote.EducationHelper
 import com.dcelysia.csust_spider.education.data.remote.services.AuthService
-import com.dcelysia.csust_spider.education.data.remote.services.EduCourseService
+import com.dcelysia.csust_spider.education.data.remote.services.ExamArrangeService
 import com.dcelysia.csust_spider.mooc.data.remote.repository.MoocRepository
-import com.example.csustdataget.CampusCard.CampusCardHelper
 import com.example.spider_app.databinding.ActivityMainBinding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import java.net.Authenticator
 
 class MainActivity : AppCompatActivity() {
     private val binding : ActivityMainBinding by lazy { ActivityMainBinding.inflate(layoutInflater) }
@@ -50,7 +49,18 @@ class MainActivity : AppCompatActivity() {
                 } catch (e: Exception) {
                     Log.d(TAG, e.toString())
                 }
-
+                val result = ExamArrangeService.getExamArrange("2025-2026-1","期末考试")
+                when(result){
+                    is Resource.Success -> {
+                        Log.d(TAG,"考试安排:${result.data}")
+                    }
+                    is Resource.Error -> {
+                        Log.d(TAG,"考试安排:${result.msg}")
+                    }
+                    is Resource.Loading -> {
+                        Log.d(TAG,"考试安排:加载中")
+                    }
+                }
             }
         }
         binding.course.setOnClickListener {
