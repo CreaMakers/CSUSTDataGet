@@ -14,7 +14,7 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -25,27 +25,28 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    kotlinOptions {
-        jvmTarget = "11"
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+        }
     }
 }
 
 dependencies {
     // OkHttp
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
-    implementation("com.squareup.okhttp3:okhttp-urlconnection:4.12.0")
+    implementation(libs.okhttp)
+    implementation(libs.logging.interceptor)
     //Retrofit
-    implementation("com.squareup.retrofit2:retrofit:2.9.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
-    implementation("com.squareup.retrofit2:converter-scalars:2.9.0")
+    implementation(libs.retrofit)
+    implementation(libs.converter.gson)
+    implementation(libs.converter.scalars)
     // jsoup
-    implementation("org.jsoup:jsoup:1.21.2")
+    implementation(libs.jsoup)
     //MMKV
-    implementation("com.tencent:mmkv:1.2.13")
+    implementation(libs.mmkv)
     // Gson
-    implementation("com.google.code.gson:gson:2.10.1")
-    implementation("com.tencent:mmkv:1.2.13")
+    implementation(libs.gson)
+    implementation(libs.mmkv)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
