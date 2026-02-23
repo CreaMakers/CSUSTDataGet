@@ -2,40 +2,34 @@ package com.dcelysia.csust_spider.mooc.cookie
 
 import okhttp3.Cookie
 
-// 一个可被 Gson 序列化和反序列化的 Cookie 数据类。
-
 data class SerializableCookie(
-    val name: String,
-    val value: String,
-    val expiresAt: Long,
-    val domain: String,
-    val path: String,
-    val secure: Boolean,
-    val httpOnly: Boolean,
-    val hostOnly: Boolean
+    val name: String?,
+    val value: String?,
+    val expiresAt: Long?,
+    val domain: String?,
+    val path: String?,
+    val secure: Boolean?,
+    val httpOnly: Boolean?,
+    val hostOnly: Boolean?
 ) {
-//     * 将 SerializableCookie 转换回 okhttp3.Cookie
-    fun toOkHttpCookie(): Cookie {
-        val builder = Cookie.Builder()
-            .name(name)
-            .value(value)
-            .expiresAt(expiresAt)
-            .path(path)
+    fun toOkHttpCookieOrNull(): Cookie? {
+        val safeName = name?.trim()?.takeUnless { it.isEmpty() } ?: return null
+        val safeValue = value ?: return null
+        val safeDomain = domain?.trim()?.takeUnless { it.isEmpty() } ?: return null
+        val safePath = path?.trim()?.takeUnless { it.isEmpty() } ?: "/"
+        val safeExpiresAt = expiresAt ?: return null
+        if (safeExpiresAt <= System.currentTimeMillis()) return null
 
-        if (hostOnly) {
-            builder.hostOnlyDomain(domain)
-        } else {
-            builder.domain(domain)
-        }
-
-        if (secure) {
-            builder.secure()
-        }
-
-        if (httpOnly) {
-            builder.httpOnly()
-        }
-
-        return builder.build()
+        return Cookie.Builder()
+            .name(safeName)
+            .value(safeValue)
+            .expiresAt(safeExpiresAt)
+            .path(safePath)
+            .apply {
+                if (hostOnly == true) hostOnlyDomain(safeDomain) else domain(safeDomain)
+                if (secure == true) secure()
+                if (httpOnly == true) httpOnly()
+            }
+            .build()
     }
 }

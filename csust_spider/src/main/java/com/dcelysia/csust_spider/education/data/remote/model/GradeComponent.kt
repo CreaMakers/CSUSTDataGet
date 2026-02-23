@@ -1,5 +1,8 @@
 package com.dcelysia.csust_spider.education.data.remote.model
 
+import androidx.annotation.Keep
+
+@Keep
 data class GradeComponent(
     val type: String, //成绩类型
     val grade: Double, //成绩

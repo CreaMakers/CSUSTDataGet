@@ -1,3 +1,6 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -6,6 +9,31 @@ plugins {
 android {
     namespace = "com.example.spider_app"
     compileSdk = 36
+
+    signingConfigs {
+        create("release") {
+            val keystoreProperties = Properties()
+            val keystorePropertiesFile = rootProject.file("local.properties")
+            if (keystorePropertiesFile.exists()) {
+                keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+            }
+
+            val keyStorePath = keystoreProperties.getProperty("release.storeFile")
+                ?: System.getenv("RELEASE_STORE_FILE")
+                ?: "release-key.jks"
+
+            storeFile = file(keyStorePath)
+
+            storePassword = keystoreProperties.getProperty("release.storePassword")
+                ?: System.getenv("RELEASE_STORE_PASSWORD")
+
+            keyAlias = keystoreProperties.getProperty("release.keyAlias")
+                ?: System.getenv("RELEASE_KEY_ALIAS")
+
+            keyPassword = keystoreProperties.getProperty("release.keyPassword")
+                ?: System.getenv("RELEASE_KEY_PASSWORD")
+        }
+    }
 
     defaultConfig {
         applicationId = "com.example.spider_app"
@@ -19,7 +47,7 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -30,8 +58,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    kotlinOptions {
-        jvmTarget = "11"
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+        }
     }
     buildFeatures {
         viewBinding = true
@@ -40,7 +70,7 @@ android {
 
 dependencies {
     implementation(project(":csust_spider"))
-    implementation("com.tencent:mmkv:1.2.13")
+    implementation(libs.mmkv)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
