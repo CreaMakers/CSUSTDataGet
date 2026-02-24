@@ -39,6 +39,8 @@ android {
 }
 
 dependencies {
+
+
     implementation(project(":csust_spider"))
     implementation("com.tencent:mmkv:1.2.13")
     implementation(libs.androidx.core.ktx)
