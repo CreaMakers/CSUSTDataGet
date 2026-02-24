@@ -1,10 +1,13 @@
 package com.dcelysia.csust_spider.mooc.data.remote.dto
 
+import kotlinx.serialization.Serializable
+
 data class LoginForm(
     val pwdEncryptSalt: String,
     val execution: String
 )
 
+@Serializable
 data class CheckCaptchaResponse(
     val isNeed: Boolean
 )
