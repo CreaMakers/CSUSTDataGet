@@ -1,7 +1,8 @@
 package com.dcelysia.csust_spider.education.data.remote.model
 
+import androidx.annotation.Keep
 import java.time.LocalDateTime
-
+@Keep
 data class ExamArrange(
     val campus: String,
 

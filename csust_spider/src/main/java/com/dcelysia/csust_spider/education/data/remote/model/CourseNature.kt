@@ -1,5 +1,8 @@
 package com.dcelysia.csust_spider.education.data.remote.model
 
+import androidx.annotation.Keep
+
+@Keep
 enum class CourseNature(val id: String, val chineseName: String) {
 
     OTHER("00", "其他"),
