@@ -6,6 +6,8 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical"
     tools:context=".MainActivity">
 
     <TextView
@@ -18,16 +20,36 @@
         app:layout_constraintTop_toTopOf="parent" />
     <!-- activity_main.xml -->
     <Button
-        android:id="@+id/loginButton"
+        android:id="@+id/sso_loginButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="登录" />
+        android:text="登录sso" />
+    <Button
+        android:id="@+id/edu_loginButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="登录教务" />
+    <Button
+        android:id="@+id/edu_getScoreButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="获取成绩" />
+    <Button
+        android:id="@+id/edu_getCoursesButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="获取课表" />
+    <Button
+        android:id="@+id/campus_getElectricityButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="获取电量" />
 
     <Button
-        android:id="@+id/course"
+        android:id="@+id/loginOutButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="kebiao" />
+        android:text="登出" />
 
 
 
