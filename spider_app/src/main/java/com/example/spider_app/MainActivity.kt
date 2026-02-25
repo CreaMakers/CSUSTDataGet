@@ -3,6 +3,7 @@ package com.example.spider_app
 import android.os.Bundle
 import android.util.Log
 import android.widget.Button
+import android.widget.EditText
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import com.dcelysia.csust_spider.campus.repository.CampusCardRepository
@@ -25,10 +26,16 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(binding.root)
+
+        val accountEdit = findViewById<EditText>(R.id.sso_accountEditText)
+        val passwordEdit = findViewById<EditText>(R.id.sso_passwordEditText)
         val loginButton = findViewById<Button>(R.id.sso_loginButton)
         loginButton.setOnClickListener {
+            // 在主线程读取输入框内容，然后在协程中使用
+            val account = accountEdit.text.toString()
+            val password = passwordEdit.text.toString()
             CoroutineScope(Dispatchers.IO).launch {
-                val response = SsoRepository.instance.login("测试自己填写", "测试自己填写")
+                val response = SsoRepository.instance.login(account, password)
                 val result = response.filter { it !is Resource.Loading }.first()
                 when (result) {
                     is Resource.Success -> {
@@ -43,6 +50,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+
         val loginOutButton = findViewById<Button>(R.id.loginOutButton)
         loginOutButton.setOnClickListener {
             CoroutineScope(Dispatchers.IO).launch{

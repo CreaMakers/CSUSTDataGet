@@ -1,3 +1,4 @@
+
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
@@ -8,22 +9,41 @@
     android:layout_height="match_parent"
     android:fitsSystemWindows="true"
     android:orientation="vertical"
+    android:padding="16dp"
     tools:context=".MainActivity">
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Hello World!"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        android:layout_marginBottom="8dp"
+        />
+
+    <!-- 新增：账号输入 -->
+    <EditText
+        android:id="@+id/sso_accountEditText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="请输入账号"
+        android:inputType="text"
+        android:layout_marginBottom="8dp"/>
+
+    <!-- 新增：密码输入 -->
+    <EditText
+        android:id="@+id/sso_passwordEditText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="请输入密码"
+        android:inputType="textPassword"
+        android:layout_marginBottom="12dp"/>
+
     <!-- activity_main.xml -->
     <Button
         android:id="@+id/sso_loginButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="登录sso" />
+
     <Button
         android:id="@+id/edu_loginButton"
         android:layout_width="wrap_content"
@@ -60,7 +80,4 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="登出" />
-
-
-
 </LinearLayout>
