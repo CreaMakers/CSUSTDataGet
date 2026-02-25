@@ -120,8 +120,12 @@ class PersistentCookiesStorage private constructor(private val isDebug: Boolean 
 
         return try {
             val type = object : TypeToken<List<SerializableKtorCookie>>() {}.type
-            val list: List<SerializableKtorCookie> = gson.fromJson(json, type)
-            val res = list.map { it.toKtorCookie() }
+            val list: List<SerializableKtorCookie>? = gson.fromJson(json, type)
+            if (list.isNullOrEmpty()) {
+                logD("loadFromDisk() host=$host empty or null list from disk")
+                return emptyList()
+            }
+            val res = list.mapNotNull { it.toKtorCookieOrNull() }
             logD("loadFromDisk() host=$host parsed ${res.size} cookies")
             res
         } catch (t: Throwable) {
@@ -168,18 +172,25 @@ class PersistentCookiesStorage private constructor(private val isDebug: Boolean 
         }
     }
 
-    private fun SerializableKtorCookie.toKtorCookie(): Cookie {
+    private fun SerializableKtorCookie.toKtorCookieOrNull(): Cookie? {
+        val safeName = name?.trim()?.takeUnless { it.isEmpty() } ?: return null
+        val safeValue = value ?: return null
+        val safeDomain = domain?.trim()?.takeUnless { it.isEmpty() } ?: ""
+        val safePath = path?.trim()?.takeUnless { it.isEmpty() } ?: "/"
+
         val cookie =
                 Cookie(
-                        name = name,
-                        value = value,
-                        domain = domain,
-                        path = path,
-                        secure = secure,
-                        httpOnly = httpOnly,
+                        name = safeName,
+                        value = safeValue,
+                        domain = safeDomain,
+                        path = safePath,
+                        secure = secure ?: false,
+                        httpOnly = httpOnly ?: false,
                         expires = expiresAt?.let { GMTDate(it) }
                 )
-        logD("toKtorCookie() name=$name domain=$domain path=$path expiresAt=$expiresAt")
+        logD(
+                "toKtorCookieOrNull() name=$safeName domain=$safeDomain path=$safePath expiresAt=$expiresAt"
+        )
         return cookie
     }
 
@@ -189,8 +200,8 @@ class PersistentCookiesStorage private constructor(private val isDebug: Boolean 
                         name = name,
                         value = value,
                         expiresAt = expires?.timestamp,
-                        domain = domain ?: "",
-                        path = path ?: "/",
+                        domain = domain,
+                        path = path,
                         secure = secure,
                         httpOnly = httpOnly
                 )
