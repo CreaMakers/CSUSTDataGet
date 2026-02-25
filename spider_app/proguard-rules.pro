@@ -19,9 +19,13 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+-dontwarn org.slf4j.**
+-keep class org.slf4j.** { *; }
+-keepclassmembers class * {
+    org.slf4j.Logger logger;
+}
 -dontwarn com.google.re2j.**
 -dontwarn org.jsoup.helper.Re2jRegex**
-
 -keepattributes Signature
 -keepattributes *Annotation*
 -keep class com.google.gson.stream.** { *; }
