@@ -5,11 +5,9 @@ import android.os.AsyncTask.execute
 import android.util.Log
 import android.util.Log.e
 import com.dcelysia.csust_spider.core.cookie.PersistentCookiesStorage
-import com.dcelysia.csust_spider.education.data.remote.EducationData
-import com.dcelysia.csust_spider.education.data.remote.services.AuthService
+import com.dcelysia.csust_spider.edu.EducationData
 import com.dcelysia.csust_spider.login.edu.LoginRepository
-import com.dcelysia.csust_spider.login.sso.SsoRepository
-import com.dcelysia.csust_spider.mooc.data.remote.repository.MoocRepository
+import com.dcelysia.csust_spider.login.sso.repositroy.SsoRepository
 import com.tencent.mmkv.MMKV
 import io.ktor.client.HttpClient
 import io.ktor.client.call.save
@@ -118,8 +116,8 @@ object KtorUtils {
                                 MMKV.mmkvWithID(MMKV_ID).clearAll()
                                 PersistentCookiesStorage.instance.clear()
                                 val response = SsoRepository.instance.login(
-                                    username = "202408130230",
-                                    password = "@Wsl20060606"
+                                    username = EducationData.studentId,
+                                    password = EducationData.studentPassword
                                 )
                                 val result = response.filter { it !is Resource.Loading }.first()
                                 when (result) {
