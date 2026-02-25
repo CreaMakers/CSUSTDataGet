@@ -30,6 +30,11 @@
         android:layout_height="wrap_content"
         android:text="登录教务" />
     <Button
+        android:id="@+id/mooc_loginButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="登录mooc" />
+    <Button
         android:id="@+id/edu_getScoreButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -44,6 +49,11 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="获取电量" />
+    <Button
+        android:id="@+id/campus_getHomeworksButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="获取作业" />
 
     <Button
         android:id="@+id/loginOutButton"

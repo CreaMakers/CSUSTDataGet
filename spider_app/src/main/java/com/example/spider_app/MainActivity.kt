@@ -2,23 +2,15 @@ package com.example.spider_app
 
 import android.os.Bundle
 import android.util.Log
-import android.util.Log.v
-import android.util.Log.w
 import android.widget.Button
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import com.dcelysia.csust_spider.core.KtorUtils
+import com.dcelysia.csust_spider.campus.repository.CampusCardRepository
 import com.dcelysia.csust_spider.core.Resource
-import com.dcelysia.csust_spider.core.RetrofitUtils
-import com.dcelysia.csust_spider.edu.EducationRepository
-import com.dcelysia.csust_spider.education.data.remote.EducationHelper
-import com.dcelysia.csust_spider.education.data.remote.services.AuthService
-import com.dcelysia.csust_spider.education.data.remote.services.ExamArrangeService
+import com.dcelysia.csust_spider.edu.repository.EducationRepository
 import com.dcelysia.csust_spider.login.edu.LoginRepository
-import com.dcelysia.csust_spider.login.sso.SsoRepository
-import com.dcelysia.csust_spider.mooc.data.remote.repository.MoocRepository
+import com.dcelysia.csust_spider.login.mooc.repository.MoocRepository
+import com.dcelysia.csust_spider.login.sso.repositroy.SsoRepository
 import com.example.spider_app.databinding.ActivityMainBinding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,7 +28,7 @@ class MainActivity : AppCompatActivity() {
         val loginButton = findViewById<Button>(R.id.sso_loginButton)
         loginButton.setOnClickListener {
             CoroutineScope(Dispatchers.IO).launch {
-                val response = SsoRepository.instance.login("202408130230", "@Wsl20060606")
+                val response = SsoRepository.instance.login("测试自己填写", "测试自己填写")
                 val result = response.filter { it !is Resource.Loading }.first()
                 when (result) {
                     is Resource.Success -> {
@@ -126,7 +118,60 @@ class MainActivity : AppCompatActivity() {
         }
         binding.campusGetElectricityButton.setOnClickListener {
             CoroutineScope(Dispatchers.IO).launch {
+                val response = CampusCardRepository.instance
+                    .getElectricity("金盆岭校区", "西苑11栋", "324")
+                val result = response.filter { it !is Resource.Loading }.first()
+                when (result) {
+                    is Resource.Success -> {
+                        Log.d(TAG, "获取电费成功")
+                        val data = result.data
+                        Log.d(TAG,"获取到电费：$data")
+                    }
 
+                    is Resource.Error -> {
+                        Log.d(TAG, "获取电费失败:${result.msg}")
+                    }
+
+                    else -> {}
+                }
+            }
+
+        }
+        binding.moocLoginButton.setOnClickListener {
+            CoroutineScope(Dispatchers.IO).launch {
+                val response = MoocRepository.instance.loginToMooc()
+                val result = response.filter { it !is Resource.Loading }.first()
+
+                when(result){
+                    is Resource.Success->{
+                        Log.d(TAG, "MOOC登录成功")
+                    }
+                    is Resource.Error->{
+                        Log.d(TAG, "MOOC登录失败:${result.msg}")
+                    }
+                    else -> {
+                        Log.d(TAG, "MOOC登录失败:未知问题，没有接收到Resource类信息")
+                    }
+                }
+            }
+
+        }
+        binding.campusGetHomeworksButton.setOnClickListener {
+            CoroutineScope(Dispatchers.IO).launch {
+                val response = MoocRepository.instance.getCourses()
+                val result = response.filter { it !is Resource.Loading }.first()
+
+                when(result){
+                    is Resource.Success->{
+                        Log.d(TAG, "课程：${result.data}")
+                    }
+                    is Resource.Error->{
+                        Log.d(TAG, "MOOC登录失败:${result.msg}")
+                    }
+                    else -> {
+                        Log.d(TAG, "没有接收到Resource类信息")
+                    }
+                }
             }
 
         }
