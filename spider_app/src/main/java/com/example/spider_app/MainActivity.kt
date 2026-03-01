@@ -22,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
     private val binding : ActivityMainBinding by lazy { ActivityMainBinding.inflate(layoutInflater) }
@@ -73,6 +74,9 @@ class MainActivity : AppCompatActivity() {
             lifecycleScope.launch {
                 val queryElectricity =
                     CampusCardHelper.queryElectricity("金盆岭校区", "西苑1栋", "229")
+                withContext(Dispatchers.Main) {
+                    binding.course.text = queryElectricity.toString()
+                }
                 Log.d("queryElectricity", "onCreate: $queryElectricity")
             }
         }
