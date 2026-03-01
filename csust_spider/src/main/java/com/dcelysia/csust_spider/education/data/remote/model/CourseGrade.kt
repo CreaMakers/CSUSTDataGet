@@ -1,7 +1,8 @@
 package com.dcelysia.csust_spider.education.data.remote.model
 
+import androidx.annotation.Keep
 import com.dcelysia.csust_spider.education.data.remote.model.CourseNature
-
+@Keep
 data class CourseGrade(
     val semester: String, //开课学期
     val courseID: String, //课程编号
@@ -21,7 +22,7 @@ data class CourseGrade(
     val courseNature: CourseNature, //课程性质
     val courseCategory: String //课程类别
 )
-
+@Keep
 data class CourseGradeResponse(
     val code: String,
     val msg: String,
