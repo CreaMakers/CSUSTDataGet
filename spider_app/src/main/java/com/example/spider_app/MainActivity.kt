@@ -8,12 +8,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.lifecycleScope
 import com.dcelysia.csust_spider.core.Resource
 import com.dcelysia.csust_spider.core.RetrofitUtils
 import com.dcelysia.csust_spider.education.data.remote.EducationHelper
 import com.dcelysia.csust_spider.education.data.remote.services.AuthService
 import com.dcelysia.csust_spider.education.data.remote.services.ExamArrangeService
 import com.dcelysia.csust_spider.mooc.data.remote.repository.MoocRepository
+import com.example.csustdataget.CampusCard.CampusCardHelper
 import com.example.spider_app.databinding.ActivityMainBinding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -67,6 +69,11 @@ class MainActivity : AppCompatActivity() {
             CoroutineScope(Dispatchers.IO).launch {
                 val course = EducationHelper.getCourseScheduleByTerm("","2025-2026-1")
                 Log.d(TAG,"course:${course}")
+            }
+            lifecycleScope.launch {
+                val queryElectricity =
+                    CampusCardHelper.queryElectricity("金盆岭校区", "西苑1栋", "229")
+                Log.d("queryElectricity", "onCreate: $queryElectricity")
             }
         }
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->

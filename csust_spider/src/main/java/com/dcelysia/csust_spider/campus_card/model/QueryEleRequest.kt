@@ -3,7 +3,7 @@ package com.example.csustdataget.CampusCard.model
 data class QueryEleRequest(
     val errmsg: String? = null,
     val aid: String?,
-    val account: String = "0000001",
+    val account: String = "000001",
     val room: Room,
     val floor: Floor,
     val area: Area,
