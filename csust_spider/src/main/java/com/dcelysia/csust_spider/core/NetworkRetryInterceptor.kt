@@ -1,21 +1,16 @@
 package com.dcelysia.csust_spider.core
 
-import android.R.attr.action
 import android.util.Log
 import com.dcelysia.csust_spider.education.data.remote.EducationData
 import com.dcelysia.csust_spider.education.data.remote.services.AuthService
 import com.dcelysia.csust_spider.mooc.data.remote.repository.MoocRepository
 import com.tencent.mmkv.MMKV
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
 import okhttp3.Response
-import okhttp3.ResponseBody
 import okhttp3.ResponseBody.Companion.toResponseBody
 
 //统一认证及教务登录拦截器
@@ -53,7 +48,7 @@ class NetworkRetryInterceptor(
 
                     if (ssoResult is Resource.Success) {
                         Log.d(TAG, "SSO 登录成功")
-                        val eduSuccess = AuthService.Login(
+                        val eduSuccess = AuthService.login(
                             EducationData.studentId,
                             EducationData.studentPassword
                         )

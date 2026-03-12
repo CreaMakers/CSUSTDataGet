@@ -2,7 +2,6 @@ package com.example.spider_app
 
 import android.os.Bundle
 import android.util.Log
-import android.util.Log.w
 import android.widget.Button
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -33,6 +32,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         val loginButton = findViewById<Button>(R.id.loginButton)
         loginButton.setOnClickListener {
+            lifecycleScope
             CoroutineScope(Dispatchers.IO).launch {
                 RetrofitUtils.ClearClient("moocClient")
                 RetrofitUtils.ClearClient("EducationClient")
@@ -40,14 +40,17 @@ class MainActivity : AppCompatActivity() {
                     val loginResult = MoocRepository.instance.login("202408130230","@Wsl20060606")
                     .filter { it !is Resource.Loading }
                     .first()
-                    val sso_result = AuthService.Login("202408130230", "@Wsl20060606")
-
-                    if (sso_result&&(loginResult is Resource.Success)){
+                    if(loginResult is Resource.Error){
+                        Log.d(TAG,"登陆失败, ${loginResult.msg}")
+                    }
+                    val ssoResult = AuthService.login("202408130230", "@Wsl20060606")
+                    val course = EducationHelper.getCourseScheduleByTerm("","2025-2026-1")
+                    Log.d(TAG,"course:${course}")
+                    if (ssoResult&&(loginResult is Resource.Success)){
                         val course = EducationHelper.getCourseScheduleByTerm("","2025-2026-1")
                         Log.d(TAG,"course:${course}")
-                    }
-                    else{
-                        Log.d(TAG,"登陆失败")
+                    } else if(loginResult is Resource.Error){
+                        Log.d(TAG,"登陆失败, ${loginResult.msg}")
                     }
                 } catch (e: Exception) {
                     Log.d(TAG, e.toString())
@@ -64,6 +67,10 @@ class MainActivity : AppCompatActivity() {
                         Log.d(TAG,"考试安排:加载中")
                     }
                 }
+
+
+                val rl = EducationHelper.getCourseGrades()
+                Log.d(TAG,"grades:${rl}")
             }
         }
         binding.course.setOnClickListener {

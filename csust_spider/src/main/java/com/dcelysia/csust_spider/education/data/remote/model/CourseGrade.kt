@@ -13,7 +13,7 @@ data class CourseGrade(
     val studyMode: String, //修读方式
     val gradeIdentifier: String, //成绩标识
     val credit: Double, //学分
-    val totalHours: Int, //总学时
+    val totalHours: Double, //总学时
     val gradePoint: Double, //绩点
     val retakeSemester: String, //补重学期
     val assessmentMethod: String, //考核方式

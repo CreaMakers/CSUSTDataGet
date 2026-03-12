@@ -2,11 +2,9 @@ package com.dcelysia.csust_spider.education.data.remote.services
 
 import android.util.Log
 import com.dcelysia.csust_spider.core.RetrofitUtils
-import com.dcelysia.csust_spider.education.data.remote.api.EduEhallApi
 import com.dcelysia.csust_spider.education.data.remote.api.EduLoginApi
 import com.dcelysia.csust_spider.education.data.remote.error.EduHelperError
 import com.dcelysia.csust_spider.mooc.data.remote.api.SSOAuthApi
-import com.dcelysia.csust_spider.mooc.data.remote.api.SSOEhallApi
 import retrofit2.Response
 
 object AuthService {
@@ -25,15 +23,12 @@ object AuthService {
         }
     }
 
-    suspend fun Login(account: String,password: String): Boolean{
+    suspend fun login(account: String, password: String): Boolean{
         Loginapi.login()
         val response = ssoApi.loginToEducation()
         val html = response.body().toString()
         Log.d(TAG,html)
-        if (html.contains("请输入账号")){
-            return false
-        }
-        return true
+        return !html.contains("请输入账号")
     }
 
     private fun isLogin(reponse: Response<String>): Boolean {

@@ -24,10 +24,9 @@ import java.lang.Exception
 import kotlin.jvm.java
 
 class EducationRepository private constructor() {
-    private val TAG = "EducationRepository"
     companion object {
         val instance by lazy { EducationRepository() }
-        val TAG = "EducationRepository"
+        private const val TAG = "EducationRepository"
     }
 
     private val courseScheduleApi by lazy { RetrofitUtils.instanceEduCourse.create(CourseScheduleApi::class.java) }
@@ -244,7 +243,7 @@ class EducationRepository private constructor() {
                 val credit = cols[8].text().trim().toDoubleOrNull()
                     ?: throw EduHelperError.CourseGradesRetrievalFailed("学分格式无效: ${cols[8].text()}")
 
-                val totalHours = cols[9].text().trim().toIntOrNull()
+                val totalHours = cols[9].text().trim().toDoubleOrNull()
                     ?: throw EduHelperError.CourseGradesRetrievalFailed("总学时格式无效: ${cols[9].text()}")
 
                 val gradePoint = cols[10].text().trim().toDoubleOrNull()
