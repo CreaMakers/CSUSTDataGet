@@ -37,13 +37,13 @@ class MainActivity : AppCompatActivity() {
                 RetrofitUtils.ClearClient("moocClient")
                 RetrofitUtils.ClearClient("EducationClient")
                 try {
-                    val loginResult = MoocRepository.instance.login("202408130230","@Wsl20060606")
+                    val loginResult = MoocRepository.instance.login("202411070108","%*J!64|5@SEty9s!")
                     .filter { it !is Resource.Loading }
                     .first()
                     if(loginResult is Resource.Error){
                         Log.d(TAG,"登陆失败, ${loginResult.msg}")
                     }
-                    val ssoResult = AuthService.login("202408130230", "@Wsl20060606")
+                    val ssoResult = AuthService.login("202411070108", "%*J!64|5@SEty9s!")
                     val course = EducationHelper.getCourseScheduleByTerm("","2025-2026-1")
                     Log.d(TAG,"course:${course}")
                     if (ssoResult&&(loginResult is Resource.Success)){
@@ -55,7 +55,7 @@ class MainActivity : AppCompatActivity() {
                 } catch (e: Exception) {
                     Log.d(TAG, e.toString())
                 }
-                val result = ExamArrangeService.getExamArrange("2025-2026-1","期末考试")
+                val result = ExamArrangeService.getExamArrange("2025-2026-2")
                 when(result){
                     is Resource.Success -> {
                         Log.d(TAG,"考试安排:${result.data}")
