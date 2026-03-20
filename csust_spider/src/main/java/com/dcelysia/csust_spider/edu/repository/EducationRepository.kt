@@ -4,6 +4,8 @@ import android.os.Build
 import android.util.Log
 import com.dcelysia.csust_spider.core.KtorUtils
 import com.dcelysia.csust_spider.core.Resource
+import com.dcelysia.csust_spider.core.SpiderError
+import com.dcelysia.csust_spider.core.SpiderErrors
 import com.dcelysia.csust_spider.edu.error.EduHelperError
 import com.dcelysia.csust_spider.edu.model.Course
 import com.dcelysia.csust_spider.edu.model.CourseGrade
@@ -30,6 +32,21 @@ class EducationRepository private constructor() {
     companion object {
         val instance = EducationRepository()
         const val TAG = "EducationRepository"
+    }
+
+    private fun <T> errorOf(
+        code: String,
+        message: String,
+        source: String,
+        endpoint: String,
+        category: SpiderError.Category
+    ): Resource.Error<T> {
+        val error = SpiderError(code, message, source, category, endpoint = endpoint)
+        return Resource.Error(error)
+    }
+
+    private fun <T> throwableError(throwable: Throwable, source: String, endpoint: String): Resource.Error<T> {
+        return Resource.Error(SpiderErrors.fromThrowable(throwable, source, endpoint))
     }
 
     // ───────────────────────────────────────────────
@@ -69,12 +86,12 @@ class EducationRepository private constructor() {
 
                 val html = response.bodyAsText()
                 if (html.isBlank()) {
-                    emit(Resource.Error("响应体为空"))
+                    emit(errorOf("EDU_GRADE_EMPTY_BODY", "响应体为空", "EducationRepository.getCourseGrades", "/jsxsd/kscj/cjcx_list", SpiderError.Category.PARSE))
                     return@flow
                 }
 
                 if (html.contains("用户登录") || html.contains("统一身份认证")) {
-                    emit(Resource.Error("登录状态已失效，请重新登录"))
+                    emit(errorOf("EDU_GRADE_AUTH_EXPIRED", "登录状态已失效，请重新登录", "EducationRepository.getCourseGrades", "/jsxsd/kscj/cjcx_list", SpiderError.Category.AUTH))
                     return@flow
                 }
 
@@ -83,7 +100,7 @@ class EducationRepository private constructor() {
             }
                     .catch { e ->
                         Log.e(TAG, "getCourseGrades: 获取成绩失败", e)
-                        emit(Resource.Error("获取成绩失败:${e.message}"))
+                        emit(throwableError(e, "EducationRepository.getCourseGrades", "/jsxsd/kscj/cjcx_list"))
                     }
 
     private fun parseCourseGrades(html: String): List<CourseGrade> {
@@ -201,12 +218,12 @@ class EducationRepository private constructor() {
                         .bodyAsText()
 
                 if (html.isBlank()) {
-                    emit(Resource.Error("响应体为空"))
+                    emit(errorOf("EDU_SEMESTER_EMPTY_BODY", "响应体为空", "EducationRepository.getAvailableSemestersForCourseGrades", "/jsxsd/kscj/cjcx_query", SpiderError.Category.PARSE))
                     return@flow
                 }
 
                 if (html.contains("用户登录") || html.contains("统一身份认证")) {
-                    emit(Resource.Error("登录状态已失效，请重新登录"))
+                    emit(errorOf("EDU_SEMESTER_AUTH_EXPIRED", "登录状态已失效，请重新登录", "EducationRepository.getAvailableSemestersForCourseGrades", "/jsxsd/kscj/cjcx_query", SpiderError.Category.AUTH))
                     return@flow
                 }
 
@@ -214,7 +231,7 @@ class EducationRepository private constructor() {
             }
                     .catch { e ->
                         Log.e(TAG, "getAvailableSemestersForCourseGrades error", e)
-                        emit(Resource.Error("获取学期列表失败: ${e.message}"))
+                        emit(throwableError(e, "EducationRepository.getAvailableSemestersForCourseGrades", "/jsxsd/kscj/cjcx_query"))
                     }
 
     private fun parseAvailableSemesters(html: String): List<String> {
@@ -251,12 +268,12 @@ class EducationRepository private constructor() {
                 val html = KtorUtils.educationClientForService.get(url).bodyAsText()
 
                 if (html.isBlank()) {
-                    emit(Resource.Error("响应体为空"))
+                    emit(errorOf("EDU_GRADE_DETAIL_EMPTY_BODY", "响应体为空", "EducationRepository.getGradeDetail", url, SpiderError.Category.PARSE))
                     return@flow
                 }
 
                 if (html.contains("用户登录") || html.contains("统一身份认证")) {
-                    emit(Resource.Error("登录状态已失效，请重新登录"))
+                    emit(errorOf("EDU_GRADE_DETAIL_AUTH_EXPIRED", "登录状态已失效，请重新登录", "EducationRepository.getGradeDetail", url, SpiderError.Category.AUTH))
                     return@flow
                 }
 
@@ -265,7 +282,7 @@ class EducationRepository private constructor() {
             }
                     .catch { e ->
                         Log.e(TAG, "getGradeDetail error", e)
-                        emit(Resource.Error("获取成绩详情失败: ${e.message}"))
+                        emit(throwableError(e, "EducationRepository.getGradeDetail", url))
                     }
 
     private fun parseGradeDetail(html: String): GradeDetail {
@@ -351,7 +368,7 @@ class EducationRepository private constructor() {
                 Log.d(TAG, "getCourseScheduleByTerm html length: ${html.length}")
 
                 if (html.contains("用户登录") || html.contains("统一身份认证")) {
-                    emit(Resource.Error("需要重新登录"))
+                    emit(errorOf("EDU_SCHEDULE_AUTH_EXPIRED", "需要重新登录", "EducationRepository.getCourseScheduleByTerm", "/jsxsd/xskb/xskb_list.do", SpiderError.Category.AUTH))
                     return@flow
                 }
 
@@ -359,7 +376,7 @@ class EducationRepository private constructor() {
             }
                     .catch { e ->
                         Log.e(TAG, "getCourseScheduleByTerm error", e)
-                        emit(Resource.Error("发生错误: ${e.message}"))
+                        emit(throwableError(e, "EducationRepository.getCourseScheduleByTerm", "/jsxsd/xskb/xskb_list.do"))
                     }
 
     private fun parseCourseSchedule(html: String): Resource<List<Course>> {
@@ -371,7 +388,15 @@ class EducationRepository private constructor() {
             val emptyDataElement = document.select("td[colspan=10]")
             if (emptyDataElement.any { it.text().contains("未查询到数据") }) {
                 Log.d(TAG, "未查询到课程数据")
-                return Resource.Error("未查询到课程")
+                return Resource.Error(
+                    SpiderError(
+                        code = "EDU_SCHEDULE_EMPTY_RESULT",
+                        message = "未查询到课程",
+                        source = "EducationRepository.parseCourseSchedule",
+                        category = SpiderError.Category.BUSINESS,
+                        endpoint = "/jsxsd/xskb/xskb_list.do"
+                    )
+                )
             }
 
             val courseDivs = document.select("div.kbcontent")
@@ -422,7 +447,13 @@ class EducationRepository private constructor() {
             }
         } catch (e: Exception) {
             Log.e(TAG, "parseCourseSchedule error", e)
-            return Resource.Error("解析课程表失败: ${e.message}")
+            return Resource.Error(
+                SpiderErrors.fromThrowable(
+                    throwable = e,
+                    source = "EducationRepository.parseCourseSchedule",
+                    endpoint = "/jsxsd/xskb/xskb_list.do"
+                )
+            )
         }
 
         return Resource.Success(courses)
@@ -445,7 +476,7 @@ class EducationRepository private constructor() {
                     semester.ifEmpty {
                         val semesters = getSemesterMessage()
                         if (semesters.isEmpty()) {
-                            emit(Resource.Error("获取学期信息失败：列表为空"))
+                            emit(errorOf("EDU_EXAM_SEMESTER_EMPTY", "获取学期信息失败：列表为空", "EducationRepository.getExamArrange", "/jsxsd/xsks/xsksap_query", SpiderError.Category.BUSINESS))
                             return@flow
                         }
                         semesters[0]
@@ -467,12 +498,12 @@ class EducationRepository private constructor() {
                         .bodyAsText()
 
                 if (html.isBlank()) {
-                    emit(Resource.Error("服务器返回数据为空"))
+                    emit(errorOf("EDU_EXAM_EMPTY_BODY", "服务器返回数据为空", "EducationRepository.getExamArrange", "/jsxsd/xsks/xsksap_list", SpiderError.Category.PARSE))
                     return@flow
                 }
 
                 if (html.contains("用户登录") || html.contains("统一身份认证")) {
-                    emit(Resource.Error("登录状态已失效，请重新登录"))
+                    emit(errorOf("EDU_EXAM_AUTH_EXPIRED", "登录状态已失效，请重新登录", "EducationRepository.getExamArrange", "/jsxsd/xsks/xsksap_list", SpiderError.Category.AUTH))
                     return@flow
                 }
 
@@ -482,9 +513,9 @@ class EducationRepository private constructor() {
                 if (dataDiv == null) {
                     val errorMsg = document.select("font[color=red]").text()
                     if (errorMsg.isNotEmpty()) {
-                        emit(Resource.Error("教务系统提示: $errorMsg"))
+                        emit(errorOf("EDU_EXAM_SERVER_HINT", "教务系统提示: $errorMsg", "EducationRepository.getExamArrange", "/jsxsd/xsks/xsksap_list", SpiderError.Category.BUSINESS))
                     } else {
-                        emit(Resource.Error("解析失败：未找到数据表格"))
+                        emit(errorOf("EDU_EXAM_TABLE_MISSING", "解析失败：未找到数据表格", "EducationRepository.getExamArrange", "/jsxsd/xsks/xsksap_list", SpiderError.Category.PARSE))
                     }
                     return@flow
                 }
@@ -536,15 +567,14 @@ class EducationRepository private constructor() {
                 }
 
                 if (parseError != null) {
-                    emit(Resource.Error(parseError!!))
+                    emit(errorOf("EDU_EXAM_PARSE_FAILED", parseError, "EducationRepository.getExamArrange", "/jsxsd/xsks/xsksap_list", SpiderError.Category.PARSE))
                 } else {
                     emit(Resource.Success(examList))
                 }
             }
                     .catch { e ->
                         Log.e(TAG, "getExamArrange error", e)
-                        val errorMsg = if (e is EduHelperError) e.message else "未知错误: ${e.message}"
-                        emit(Resource.Error(errorMsg ?: "发生未知错误"))
+                        emit(throwableError(e, "EducationRepository.getExamArrange", "/jsxsd/xsks/xsksap_list"))
                     }
 
     private fun parseDate(timeString: String): Pair<LocalDateTime, LocalDateTime> {

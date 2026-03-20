@@ -3,6 +3,7 @@ package com.dcelysia.csust_spider.login.edu
 import android.util.Log.e
 import com.dcelysia.csust_spider.core.KtorUtils
 import com.dcelysia.csust_spider.core.Resource
+import com.dcelysia.csust_spider.core.SpiderErrors
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
@@ -35,7 +36,16 @@ class LoginRepository private constructor(){
                 // 通过访问这个带 ticket 的地址，教务系统会验证 ticket 并设置 JSESSIONID
                 response = KtorUtils.educationClientForLogin.get(location)
             } else {
-                emit(Resource.Error("登录异常：未找到重定向地址"))
+                emit(
+                    Resource.Error(
+                        SpiderErrors.auth(
+                            code = "EDU_REDIRECT_MISSING",
+                            source = "LoginRepository.login",
+                            message = "登录异常：未找到重定向地址",
+                            endpoint = "authserver/login?service=xk.csust.edu.cn/sso.jsp"
+                        )
+                    )
+                )
                 return@flow
             }
         }
@@ -46,13 +56,22 @@ class LoginRepository private constructor(){
         // 如果重定向后页面仍然包含“请输入账号”，说明 ticket 验证失败或 session 无效
         // 或者如果没发生重定向，直接返回了登录页，也包含此文字
         if (html.contains("请输入账号")) {
-            emit(Resource.Error("教务登陆失败"))
+            emit(
+                Resource.Error(
+                    SpiderErrors.auth(
+                        code = "EDU_LOGIN_REJECTED",
+                        source = "LoginRepository.login",
+                        message = "教务登陆失败",
+                        endpoint = "xk.csust.edu.cn/sso.jsp"
+                    )
+                )
+            )
             return@flow
         }
 
         emit(Resource.Success(true))
     }.catch { e ->
         e(TAG, "login: 教务登录失败", e)
-        emit(Resource.Error("教务登录失败:${e.message}"))
+        emit(Resource.Error(SpiderErrors.fromThrowable(e, "LoginRepository.login", "xk.csust.edu.cn/sso.jsp")))
     }
 }

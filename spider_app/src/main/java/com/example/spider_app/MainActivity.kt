@@ -22,6 +22,16 @@ import kotlinx.coroutines.launch
 class MainActivity : AppCompatActivity() {
     private val binding: ActivityMainBinding by lazy { ActivityMainBinding.inflate(layoutInflater) }
     private val TAG = "MainActivity"
+
+    private fun Resource.Error<*>.debugError(): String {
+        val detail = error
+        return if (detail == null) {
+            msg
+        } else {
+            "code=${detail.code}, source=${detail.source}, category=${detail.category}, endpoint=${detail.endpoint}, message=${detail.message}, cause=${detail.causeMessage}"
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -43,7 +53,7 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     is Resource.Error -> {
-                        Log.d(TAG, "sso登录失败:${result.msg}")
+                        Log.d(TAG, "sso登录失败:${result.debugError()}")
                     }
 
                     else -> {}
@@ -62,7 +72,7 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     is Resource.Error -> {
-                        Log.d(TAG, "退出登录失败:${result.msg}")
+                        Log.d(TAG, "退出登录失败:${result.debugError()}")
                     }
 
                     else -> {}
@@ -80,7 +90,7 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     is Resource.Error -> {
-                        Log.d(TAG, "教务登录失败:${result.msg}")
+                        Log.d(TAG, "教务登录失败:${result.debugError()}")
                     }
 
                     else -> {}
@@ -98,7 +108,7 @@ class MainActivity : AppCompatActivity() {
                         Log.d(TAG, "获取到成绩：${data.data}")
                     }
                     is Resource.Error -> {
-                        Log.d(TAG, "获取成绩失败:${result.msg}")
+                        Log.d(TAG, "获取成绩失败:${result.debugError()}")
                     }
                     else -> {}
                 }
@@ -116,7 +126,7 @@ class MainActivity : AppCompatActivity() {
 
                     }
                     is Resource.Error->{
-                        Log.d(TAG, "获取课表失败:${result.msg}")
+                        Log.d(TAG, "获取课表失败:${result.debugError()}")
                     }
                     else -> {
                     }
@@ -137,7 +147,7 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     is Resource.Error -> {
-                        Log.d(TAG, "获取电费失败:${result.msg}")
+                        Log.d(TAG, "获取电费失败:${result.debugError()}")
                     }
 
                     else -> {}
@@ -155,7 +165,7 @@ class MainActivity : AppCompatActivity() {
                         Log.d(TAG, "MOOC登录成功")
                     }
                     is Resource.Error->{
-                        Log.d(TAG, "MOOC登录失败:${result.msg}")
+                        Log.d(TAG, "MOOC登录失败:${result.debugError()}")
                     }
                     else -> {
                         Log.d(TAG, "MOOC登录失败:未知问题，没有接收到Resource类信息")
@@ -174,7 +184,7 @@ class MainActivity : AppCompatActivity() {
                         Log.d(TAG, "课程：${result.data}")
                     }
                     is Resource.Error->{
-                        Log.d(TAG, "MOOC登录失败:${result.msg}")
+                        Log.d(TAG, "MOOC登录失败:${result.debugError()}")
                     }
                     else -> {
                         Log.d(TAG, "没有接收到Resource类信息")

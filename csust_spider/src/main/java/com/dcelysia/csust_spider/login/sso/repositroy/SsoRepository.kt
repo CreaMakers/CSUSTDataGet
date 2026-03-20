@@ -4,6 +4,7 @@ import android.util.Log
 import com.dcelysia.csust_spider.core.AESUtils
 import com.dcelysia.csust_spider.core.KtorUtils
 import com.dcelysia.csust_spider.core.Resource
+import com.dcelysia.csust_spider.core.SpiderErrors
 import com.dcelysia.csust_spider.login.sso.dto.CheckCaptchaResponse
 import com.dcelysia.csust_spider.login.sso.dto.LoginForm
 import io.ktor.client.request.forms.submitForm
@@ -105,14 +106,32 @@ class SsoRepository private constructor() {
         }
 
         if (loginForm == null) {
-            emit(Resource.Error("网络错误：无法获取登录表单"))
+            emit(
+                Resource.Error(
+                    SpiderErrors.business(
+                        code = "SSO_LOGIN_FORM_MISSING",
+                        source = "SsoRepository.login",
+                        message = "无法获取登录表单",
+                        endpoint = "authserver/login"
+                    )
+                )
+            )
             return@flow
         }
 
         // 2. 检查验证码 (保持 UA 一致)
         val needCaptcha = checkNeedCaptcha(username)
         if (needCaptcha) {
-            emit(Resource.Error("账号状态异常，请在手机网页登录一次\n网址: https://authserver.csust.edu.cn/authserver/login"))
+            emit(
+                Resource.Error(
+                    SpiderErrors.auth(
+                        code = "SSO_CAPTCHA_REQUIRED",
+                        source = "SsoRepository.login",
+                        message = "账号状态异常，请在手机网页登录一次",
+                        endpoint = "authserver/checkNeedCaptcha.htl"
+                    )
+                )
+            )
             return@flow
         }
 
@@ -158,13 +177,22 @@ class SsoRepository private constructor() {
             emit(Resource.Success(true))
         } else {
             // 调试用：如果失败，打印一下返回的 HTML，看看是不是有错误提示
-            emit(Resource.Error("登录失败，请检查用户名和密码"))
+            emit(
+                Resource.Error(
+                    SpiderErrors.auth(
+                        code = "SSO_LOGIN_REJECTED",
+                        source = "SsoRepository.login",
+                        message = "登录失败，请检查用户名和密码",
+                        endpoint = "authserver/login"
+                    )
+                )
+            )
         }
 
     }.catch { e ->
         e.printStackTrace()
         Log.e(TAG, "登录流程异常: ${e.message}")
-        emit(Resource.Error("网络错误: ${e.message}"))
+        emit(Resource.Error(SpiderErrors.fromThrowable(e, "SsoRepository.login", "authserver/login")))
     }
     /**
      * 登出
@@ -187,6 +215,6 @@ class SsoRepository private constructor() {
             Log.e(TAG, "Logout failed", e)
             // 即使网络失败，本地状态也必须清理
             KtorUtils.clearClient()
-            emit(Resource.Error("登出失败")) // 依然视为登出成功
+            emit(Resource.Error(SpiderErrors.fromThrowable(e, "SsoRepository.logout", "authserver/logout"))) // 依然视为登出成功
         }
 }

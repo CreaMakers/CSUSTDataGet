@@ -3,6 +3,7 @@ package com.dcelysia.csust_spider.campus.repository
 import android.util.Log
 import com.dcelysia.csust_spider.core.KtorUtils
 import com.dcelysia.csust_spider.core.Resource
+import com.dcelysia.csust_spider.core.SpiderErrors
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.Parameters
@@ -111,7 +112,16 @@ class CampusCardRepository private constructor() {
                 val buildingId = buildingMap[buildingName]
 
                 if (campusId.isNullOrBlank() || buildingId.isNullOrBlank()) {
-                    emit(Resource.Error("无效的校区或楼栋名称: $campusName / $buildingName"))
+                    emit(
+                        Resource.Error(
+                            SpiderErrors.business(
+                                code = "CAMPUS_INVALID_BUILDING_INPUT",
+                                source = "CampusCardRepository.getElectricity",
+                                message = "无效的校区或楼栋名称: $campusName / $buildingName",
+                                endpoint = ENDPOINT
+                            )
+                        )
+                    )
                     return@flow
                 }
 
@@ -139,19 +149,19 @@ class CampusCardRepository private constructor() {
                 Log.d(TAG, "getElectricity response: $body")
 
                 if (body.isBlank()) {
-                    emit(Resource.Error("响应体为空"))
+                    emit(Resource.Error(SpiderErrors.parse("CAMPUS_EMPTY_BODY", "CampusCardRepository.getElectricity", "响应体为空", ENDPOINT)))
                     return@flow
                 }
 
                 if (body.contains("无法获取房间信息")) {
-                    emit(Resource.Error("无法获取房间信息，请检查楼栋或房间号"))
+                    emit(Resource.Error(SpiderErrors.business("CAMPUS_ROOM_NOT_FOUND", "CampusCardRepository.getElectricity", "无法获取房间信息，请检查楼栋或房间号", ENDPOINT)))
                     return@flow
                 }
 
                 val electricity =
                     extractElectricity(body)
                         ?: run {
-                            emit(Resource.Error("无法从响应中解析电量数据"))
+                            emit(Resource.Error(SpiderErrors.parse("CAMPUS_ELECTRICITY_PARSE_FAILED", "CampusCardRepository.getElectricity", "无法从响应中解析电量数据", ENDPOINT)))
                             return@flow
                         }
 
@@ -159,7 +169,7 @@ class CampusCardRepository private constructor() {
             }
                     .catch { e ->
                         Log.e(TAG, "getElectricity: 查询电费失败", e)
-                        emit(Resource.Error("查询电费失败: ${e.message}"))
+                        emit(Resource.Error(SpiderErrors.fromThrowable(e, "CampusCardRepository.getElectricity", ENDPOINT)))
                     }
 
     /** 拼装请求 JSON 字符串，与原 CampusCardHelper.queryElectricity 保持一致 */

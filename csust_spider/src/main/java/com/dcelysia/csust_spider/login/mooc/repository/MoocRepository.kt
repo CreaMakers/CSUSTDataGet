@@ -3,6 +3,7 @@ package com.dcelysia.csust_spider.login.mooc.repository
 import android.util.Log
 import com.dcelysia.csust_spider.core.KtorUtils
 import com.dcelysia.csust_spider.core.Resource
+import com.dcelysia.csust_spider.core.SpiderErrors
 import com.dcelysia.csust_spider.login.mooc.dto.MoocCourse
 import com.dcelysia.csust_spider.login.mooc.dto.MoocHomework
 import com.dcelysia.csust_spider.login.mooc.dto.MoocHomeworkResponse
@@ -57,12 +58,21 @@ class MoocRepository private constructor() {
             emit(Resource.Success(true))
         } else {
             Log.e(TAG, "MOOC SSO 跳转失败，停留页面: $finalUrl")
-            emit(Resource.Error("MOOC 系统同步登录失败"))
+            emit(
+                Resource.Error(
+                    SpiderErrors.auth(
+                        code = "MOOC_SSO_SYNC_FAILED",
+                        source = "MoocRepository.loginToMooc",
+                        message = "MOOC 系统同步登录失败",
+                        endpoint = "meol/homepage/common/sso_login.jsp"
+                    )
+                )
+            )
         }
     }.catch { e ->
         e.printStackTrace()
         Log.e(TAG, "MOOC 登录异常", e)
-        emit(Resource.Error("网络错误: ${e.message}"))
+        emit(Resource.Error(SpiderErrors.fromThrowable(e, "MoocRepository.loginToMooc", "meol/homepage/common/sso_login.jsp")))
     }
 
     /**
@@ -74,13 +84,22 @@ class MoocRepository private constructor() {
         val response = KtorUtils.moocClient.get("meol/personal.do")
 
         if (!response.status.isSuccess()) {
-            emit(Resource.Error("HTTP ${response.status.value}"))
+            emit(
+                Resource.Error(
+                    SpiderErrors.business(
+                        code = "MOOC_PROFILE_HTTP_FAILED",
+                        source = "MoocRepository.getProfile",
+                        message = "获取个人资料失败: HTTP ${response.status.value}",
+                        endpoint = "meol/personal.do"
+                    )
+                )
+            )
             return@flow
         }
 
         val html = response.bodyAsText()
         if (html.isEmpty()) {
-            emit(Resource.Error("响应内容为空"))
+            emit(Resource.Error(SpiderErrors.parse("MOOC_PROFILE_EMPTY_BODY", "MoocRepository.getProfile", "响应内容为空", "meol/personal.do")))
             return@flow
         }
 
@@ -88,7 +107,7 @@ class MoocRepository private constructor() {
         val elements = document.select(".userinfobody > ul > li")
 
         if (elements.size < 5) {
-            emit(Resource.Error("解析失败：页面结构已变更"))
+            emit(Resource.Error(SpiderErrors.parse("MOOC_PROFILE_DOM_CHANGED", "MoocRepository.getProfile", "解析失败：页面结构已变更", "meol/personal.do")))
             return@flow
         }
 
@@ -107,11 +126,11 @@ class MoocRepository private constructor() {
             )
             emit(Resource.Success(profile))
         } catch (e: Exception) {
-            emit(Resource.Error("数据解析异常"))
+            emit(Resource.Error(SpiderErrors.fromThrowable(e, "MoocRepository.getProfile", "meol/personal.do")))
         }
     }.catch { e ->
         Log.e(TAG, "获取个人资料失败", e)
-        emit(Resource.Error("网络错误"))
+        emit(Resource.Error(SpiderErrors.fromThrowable(e, "MoocRepository.getProfile", "meol/personal.do")))
     }
 
     /**
@@ -127,7 +146,7 @@ class MoocRepository private constructor() {
         val tableElement = document.getElementById("table2")
 
         if (tableElement == null) {
-            emit(Resource.Error("未找到课程列表，可能未登录"))
+            emit(Resource.Error(SpiderErrors.auth("MOOC_COURSE_TABLE_MISSING", "MoocRepository.getCourses", "未找到课程列表，可能未登录", "meol/lesson/blen.student.lesson.list.jsp")))
             return@flow
         }
 
@@ -160,7 +179,7 @@ class MoocRepository private constructor() {
         emit(Resource.Success(courses))
     }.catch { e ->
         Log.e(TAG, "获取课程失败", e)
-        emit(Resource.Error("网络错误"))
+        emit(Resource.Error(SpiderErrors.fromThrowable(e, "MoocRepository.getCourses", "meol/lesson/blen.student.lesson.list.jsp")))
     }
 
     /**
@@ -195,11 +214,20 @@ class MoocRepository private constructor() {
 
             emit(Resource.Success(homeworks))
         } else {
-            emit(Resource.Error("获取作业失败: ${response.status}"))
+            emit(
+                Resource.Error(
+                    SpiderErrors.business(
+                        code = "MOOC_HOMEWORK_HTTP_FAILED",
+                        source = "MoocRepository.getCourseHomeworks",
+                        message = "获取作业失败: ${response.status}",
+                        endpoint = "meol/hw/stu/hwStuHwtList.do"
+                    )
+                )
+            )
         }
     }.catch { e ->
         Log.e(TAG, "获取作业异常", e)
-        emit(Resource.Error("网络错误"))
+        emit(Resource.Error(SpiderErrors.fromThrowable(e, "MoocRepository.getCourseHomeworks", "meol/hw/stu/hwStuHwtList.do")))
     }
 
     /**
@@ -250,7 +278,7 @@ class MoocRepository private constructor() {
         emit(Resource.Success(tests))
     }.catch { e ->
         Log.e(TAG, "获取测试异常", e)
-        emit(Resource.Error("网络错误"))
+        emit(Resource.Error(SpiderErrors.fromThrowable(e, "MoocRepository.getCourseTests", "meol/common/question/test/student/list.jsp")))
     }
 
     /**
@@ -295,7 +323,7 @@ class MoocRepository private constructor() {
         emit(Resource.Success(courseNames.toList()))
     }.catch { e ->
         e.printStackTrace()
-        emit(Resource.Error("网络错误"))
+        emit(Resource.Error(SpiderErrors.fromThrowable(e, "MoocRepository.getCourseNamesWithPendingHomeworks", "meol/welcomepage/student/interaction_reminder_v8.jsp")))
     }
 
 
