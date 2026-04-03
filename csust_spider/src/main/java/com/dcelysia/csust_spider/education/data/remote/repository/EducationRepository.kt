@@ -1,27 +1,27 @@
 package com.dcelysia.csust_spider.education.data.remote.repository
 
 import android.util.Log
-import android.util.Log.e
 import com.dcelysia.csust_spider.core.Resource
 import com.dcelysia.csust_spider.core.RetrofitUtils
 import com.dcelysia.csust_spider.education.data.remote.api.CourseGradeApi
 import com.dcelysia.csust_spider.education.data.remote.api.CourseScheduleApi
+import com.dcelysia.csust_spider.education.data.remote.api.RelexClassroomInfoApi
+import com.dcelysia.csust_spider.education.data.remote.model.Campus
 import com.dcelysia.csust_spider.education.data.remote.error.EduHelperError
 import com.dcelysia.csust_spider.education.data.remote.model.Course
 import com.dcelysia.csust_spider.education.data.remote.model.CourseGrade
 import com.dcelysia.csust_spider.education.data.remote.model.CourseGradeResponse
 import com.dcelysia.csust_spider.education.data.remote.model.CourseNature
+import com.dcelysia.csust_spider.education.data.remote.model.DayOfWeek
 import com.dcelysia.csust_spider.education.data.remote.model.DisplayMode
 import com.dcelysia.csust_spider.education.data.remote.model.GradeComponent
 import com.dcelysia.csust_spider.education.data.remote.model.GradeDetail
 import com.dcelysia.csust_spider.education.data.remote.model.GradeDetailResponse
 import com.dcelysia.csust_spider.education.data.remote.model.StudyMode
-import com.dcelysia.csust_spider.education.data.remote.services.AuthService
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
-import org.jsoup.nodes.Element
 import java.lang.Exception
-import kotlin.jvm.java
+import kotlin.getValue
 
 class EducationRepository private constructor() {
     companion object {
@@ -31,12 +31,9 @@ class EducationRepository private constructor() {
 
     private val courseScheduleApi by lazy { RetrofitUtils.instanceEduCourse.create(CourseScheduleApi::class.java) }
     private val courseGradeApi by lazy { RetrofitUtils.instanceScoreInquiry.create(CourseGradeApi::class.java) }
-//    private val relexClassroomInfoApi by lazy {
-//        RetrofitUtils
-//            .instanceRelexClassroomInfo.create(
-//                RelexClassroomInfoApi::class.java
-//            )
-//    }
+    private val relexClassroomInfoApi by lazy {
+        RetrofitUtils.instanceRelexClassroomInfo.create(RelexClassroomInfoApi::class.java)
+    }
 
     /**
      * Gets course schedule by term and parses it into a List of Course objects
@@ -143,6 +140,80 @@ class EducationRepository private constructor() {
         }
         
         return Resource.Success(courses)
+    }
+
+    /**
+     * 获取指定校区在指定时间内空闲的教室列表。
+     *
+     * 逻辑参考 iOS `CourseService.getAvailableClassrooms`：
+     * 先将大节映射为具体节次范围，再请求教务系统空教室页面并解析课表，
+     * 最终筛出当前时间段没有占用的教室名称。
+     *
+     * @param campus 校区
+     * @param week 周数
+     * @param dayOfWeek 星期
+     * @param section 节次（大节，范围：1-5）
+     * @throws EduHelperError.AvailableClassroomsRetrievalFailed 当请求失败、参数非法或页面结构异常时抛出
+     * @throws EduHelperError.NotLoggedIn 当教务登录状态失效时抛出
+     * @return 空闲教室列表
+     */
+    suspend fun getAvailableClassrooms(
+        campus: Campus,
+        week: Int,
+        dayOfWeek: DayOfWeek,
+        section: Int
+    ): List<String> {
+        val sectionRange = when (section) {
+            1 -> "01" to "02"
+            2 -> "03" to "04"
+            3 -> "05" to "06"
+            4 -> "07" to "08"
+            5 -> "09" to "10"
+            else -> throw EduHelperError.AvailableClassroomsRetrievalFailed("节次范围错误：1-5")
+        }
+
+        val response = relexClassroomInfoApi.getAvailableClassrooms(
+            campusId = campus.id,
+            weekStart = week.toString(),
+            weekEnd = week.toString(),
+            dayOfWeekStart = dayOfWeek.value.toString(),
+            dayOfWeekEnd = dayOfWeek.value.toString(),
+            sectionStart = sectionRange.first,
+            sectionEnd = sectionRange.second
+        )
+
+        if (!response.isSuccessful) {
+            throw EduHelperError.AvailableClassroomsRetrievalFailed("网络请求失败：${response.code()}")
+        }
+
+        val html = response.body().orEmpty()
+        if (html.isBlank()) {
+            throw EduHelperError.AvailableClassroomsRetrievalFailed("响应体为空")
+        }
+        if (html.contains("用户登录") || html.contains("统一身份认证")) {
+            throw EduHelperError.NotLoggedIn("登录状态已失效，请重新登录")
+        }
+
+        val document = Jsoup.parse(html)
+        val table = document.selectFirst("#kbtable")
+            ?: throw EduHelperError.AvailableClassroomsRetrievalFailed("未找到课程表")
+        val rows = table.select("tbody > tr")
+        if (rows.isEmpty()) {
+            return emptyList()
+        }
+
+        return rows.mapNotNull { row ->
+            val cells = row.select("td")
+            val classroom = cells.firstOrNull()?.text()?.trim().orEmpty()
+            if (classroom.isEmpty()) {
+                return@mapNotNull null
+            }
+
+            val occupied = cells.drop(1).any { cell ->
+                cell.select("div.kbcontent1").isNotEmpty() || cell.text().trim().isNotEmpty()
+            }
+            if (occupied) null else classroom
+        }
     }
 
     /* 获取课程成绩

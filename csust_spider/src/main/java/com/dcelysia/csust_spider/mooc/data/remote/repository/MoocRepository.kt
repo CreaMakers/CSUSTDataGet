@@ -12,6 +12,7 @@ import com.dcelysia.csust_spider.mooc.data.remote.dto.MoocHomework
 import com.dcelysia.csust_spider.mooc.data.remote.dto.MoocProfile
 import com.dcelysia.csust_spider.mooc.data.remote.dto.MoocTest
 import com.dcelysia.csust_spider.mooc.data.remote.dto.PendingAssignmentCourse
+import com.dcelysia.csust_spider.mooc.data.remote.error.MoocHelperError
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
@@ -26,6 +27,10 @@ class MoocRepository private constructor() {
     private val api by lazy { RetrofitUtils.instanceMooc.create(MoocApi::class.java) }
     private val ssoAuthApi by lazy { RetrofitUtils.instanceSSOAuth.create(SSOAuthApi::class.java) }
     private val ssoEhallApi by lazy { RetrofitUtils.instanceSSOEhall.create(SSOEhallApi::class.java) }
+
+    private fun isLoginRequired(response: String): Boolean {
+        return response.contains("<TITLE>错误！</TITLE>") || response.contains("请登录！")
+    }
 
     // 检查是否需要验证码
     private suspend fun checkNeedCaptcha(username: String): Boolean {
@@ -369,6 +374,63 @@ class MoocRepository private constructor() {
         e.printStackTrace()
         Log.e("MoocRepository", "获取课程测试失败: ${e.message}")
         emit(Resource.Error("网络错误"))
+    }
+
+    /**
+     * 获取指定课程的测验列表。
+     *
+     * 逻辑参考 iOS `MoocHelper.getCourseTests`：
+     * 请求课程测验页面后解析 `.valuelist` 表格，并提取标题、开始时间、
+     * 截止时间、允许重考次数、限时和提交状态。
+     *
+     * @param courseId 课程 ID
+     * @throws MoocHelperError.TestRetrievalFailed 当请求失败、返回为空或页面结构异常时抛出
+     * @throws MoocHelperError.CookieExpiredException 当 MOOC 登录状态失效时抛出
+     * @return 课程测验列表
+     */
+    suspend fun getCourseTestsDirect(courseId: String): List<MoocTest> {
+        val response = api.getCourseTests(cateId = courseId)
+        if (!response.isSuccessful) {
+            throw MoocHelperError.TestRetrievalFailed("HTTP ${response.code()}")
+        }
+
+        val html = response.body().orEmpty()
+        if (html.isBlank()) {
+            throw MoocHelperError.TestRetrievalFailed("Empty response")
+        }
+        if (isLoginRequired(html)) {
+            throw MoocHelperError.CookieExpiredException("请先重新登录 MOOC")
+        }
+
+        val document = Jsoup.parse(html)
+        val tableElement = document.getElementsByClass("valuelist").firstOrNull()
+            ?: throw MoocHelperError.TestRetrievalFailed("Test table not found")
+        val rows = tableElement.getElementsByTag("tr")
+        if (rows.size <= 1) {
+            return emptyList()
+        }
+
+        val tests = mutableListOf<MoocTest>()
+        for (i in 1 until rows.size) {
+            val cols = rows[i].getElementsByTag("td")
+            if (cols.size < 8) {
+                throw MoocHelperError.TestRetrievalFailed("测试表格行格式异常")
+            }
+
+            val timeLimit = cols[4].text().toIntOrNull()
+                ?: throw MoocHelperError.TestRetrievalFailed("时间限制格式无效")
+
+            tests += MoocTest(
+                title = cols[0].text(),
+                startTime = cols[1].text(),
+                endTime = cols[2].text(),
+                allowRetake = cols[3].text().takeUnless { it == "不限制" }?.toIntOrNull(),
+                timeLimit = timeLimit,
+                isSubmitted = cols[7].html().contains("查看结果")
+            )
+        }
+
+        return tests
     }
 
     fun getCourseNamesWithPendingHomeworks(): Flow<Resource<List<PendingAssignmentCourse>>> = flow {

@@ -2,9 +2,11 @@ package com.dcelysia.csust_spider.education.data.remote
 
 import android.util.Log
 import com.dcelysia.csust_spider.core.Resource
+import com.dcelysia.csust_spider.education.data.remote.model.Campus
 import com.dcelysia.csust_spider.education.data.remote.model.Course
 import com.dcelysia.csust_spider.education.data.remote.model.CourseGradeResponse
 import com.dcelysia.csust_spider.education.data.remote.model.CourseNature
+import com.dcelysia.csust_spider.education.data.remote.model.DayOfWeek
 import com.dcelysia.csust_spider.education.data.remote.model.DisplayMode
 import com.dcelysia.csust_spider.education.data.remote.model.GradeDetailResponse
 import com.dcelysia.csust_spider.education.data.remote.model.StudyMode
@@ -92,34 +94,29 @@ object EducationHelper {
         }
     }
 
-//    /**
-//     * Gets classroom information and returns raw HTML string
-//     *
-//     * @param xnxqh 学期字段，示例："2024-2025-1"
-//     * @param xqbh 校区编号，用于指定查询的校区/区域
-//     * @param zc 开始周次（查询的起始周）
-//     * @param zc2 结束周次（查询的结束周）示例：第一周
-//     * @param xq 开始星期，示例：星期一
-//     * @param xq2 结束星期，示例：星期二
-//     * @param jc 开始节次（节次的起始值）示例：01
-//     * @param jc2 结束节次（节次的结束值）示例：02
-//     * @return Raw HTML string of the classroom information
-//     */
-//    suspend fun getRelexClassroom(
-//        xnxqh: String,
-//        xqbh: String,
-//        zc: String,
-//        zc2: String,
-//        xq: String,
-//        xq2: String,
-//        jc: String,
-//        jc2: String
-//    ): Resource<String> {
-//        return try {
-//            repository.getRelexClassroom(xnxqh, xqbh, zc, zc2, xq, xq2, jc, jc2)
-//        } catch (e: Exception) {
-//            Log.d(TAG, e.toString())
-//            Resource.Error("发生错误")
-//        }
-//    }
+    /**
+     * 获取指定校区在指定时间内空闲的教室列表。
+     *
+     * 参考 iOS `CourseService.getAvailableClassrooms` 的调用方式，
+     * 这里直接暴露为简化后的 suspend 方法。
+     *
+     * @param campus 校区
+     * @param week 周数
+     * @param dayOfWeek 星期
+     * @param section 节次（大节，范围：1-5）
+     * @return 空闲教室列表；查询失败时返回空列表
+     */
+    suspend fun getAvailableClassrooms(
+        campus: Campus,
+        week: Int,
+        dayOfWeek: DayOfWeek,
+        section: Int
+    ): List<String> {
+        return try {
+            repository.getAvailableClassrooms(campus, week, dayOfWeek, section)
+        } catch (e: Exception) {
+            Log.e(TAG, e.toString())
+            emptyList()
+        }
+    }
 }

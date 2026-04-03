@@ -14,4 +14,5 @@ sealed class EduHelperError(message: String) : Exception(message) {
     class availableSemestersForExamScheduleRetrievalFailed(message: String): EduHelperError(message)
 
     class TimeParseFailed(message: String): EduHelperError(message)
+    class AvailableClassroomsRetrievalFailed(message: String) : EduHelperError(message)
 }
