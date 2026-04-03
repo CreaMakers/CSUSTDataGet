@@ -13,6 +13,7 @@ import com.dcelysia.csust_spider.mooc.data.remote.dto.MoocProfile
 import com.dcelysia.csust_spider.mooc.data.remote.dto.MoocTest
 import com.dcelysia.csust_spider.mooc.data.remote.dto.PendingAssignmentCourse
 import com.dcelysia.csust_spider.mooc.data.remote.error.MoocHelperError
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
@@ -311,69 +312,12 @@ class MoocRepository private constructor() {
 
     fun getCourseTests(courseId: String) = flow {
         emit(Resource.Loading())
-
-        val response = api.getCourseTests(cateId = courseId)
-        if (!response.isSuccessful) {
-            emit(Resource.Error("HTTP ${response.code()}"))
-            return@flow
-        }
-
-        val html = response.body()
-        if (html.isNullOrEmpty()) {
-            emit(Resource.Error("Empty response"))
-            return@flow
-        }
-
-        val document = Jsoup.parse(html)
-        val tableElement = document.getElementsByClass("valuelist").firstOrNull()
-        if (tableElement == null) {
-            emit(Resource.Error("Test table not found"))
-            return@flow
-        }
-
-        val rows = tableElement.getElementsByTag("tr")
-        if (rows.isEmpty()) {
-            emit(Resource.Error("Invalid test table format"))
-            return@flow
-        }
-
-        val tests = mutableListOf<MoocTest>()
-
-        for (i in 1 until rows.size) {
-            val row = rows[i]
-            val cols = row.getElementsByTag("td")
-
-            if (cols.size < 8) {
-                continue // 跳过格式不正确的行
-            }
-
-            val title = cols[0].text()
-            val startTime = cols[1].text()
-            val endTime = cols[2].text()
-            val rawAllowRetake = cols[3].text()
-            val allowRetake =
-                if (rawAllowRetake == "不限制") null else rawAllowRetake.toIntOrNull()
-            val timeLimit = cols[4].text().toIntOrNull() ?: 0
-            val isSubmitted = cols[7].html().contains("查看结果")
-
-            tests.add(
-                MoocTest(
-                    title = title,
-                    startTime = startTime,
-                    endTime = endTime,
-                    allowRetake = allowRetake,
-                    timeLimit = timeLimit,
-                    isSubmitted = isSubmitted
-                )
-            )
-        }
-
-        emit(Resource.Success(tests))
-
+        emit(Resource.Success(getCourseTestsDirect(courseId)))
     }.catch { e ->
+        if (e is CancellationException) throw e
         e.printStackTrace()
         Log.e("MoocRepository", "获取课程测试失败: ${e.message}")
-        emit(Resource.Error("网络错误"))
+        emit(Resource.Error(e.message ?: "网络错误"))
     }
 
     /**
