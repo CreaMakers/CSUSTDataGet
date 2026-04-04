@@ -1,5 +1,8 @@
 package com.dcelysia.csust_spider.mooc.data.remote.dto
 
+import androidx.annotation.Keep
+
+@Keep
 data class MoocCourse(
     val id: String,
     val number: String,
@@ -7,7 +10,7 @@ data class MoocCourse(
     val department: String,
     val teacher: String
 )
-
+@Keep
 data class PendingAssignmentCourse(
     val id: String,
     val name: String

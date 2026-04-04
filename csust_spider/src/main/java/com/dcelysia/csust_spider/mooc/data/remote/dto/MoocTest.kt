@@ -1,5 +1,8 @@
 package com.dcelysia.csust_spider.mooc.data.remote.dto
 
+import androidx.annotation.Keep
+
+@Keep
 data class MoocTest(
     val title: String,
     val startTime: String,
