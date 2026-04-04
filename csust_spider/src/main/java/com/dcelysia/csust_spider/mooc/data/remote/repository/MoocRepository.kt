@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import org.jsoup.Jsoup
+import java.util.regex.Pattern
 
 class MoocRepository private constructor() {
     companion object {
