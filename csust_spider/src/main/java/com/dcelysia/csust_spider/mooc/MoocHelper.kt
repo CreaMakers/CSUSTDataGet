@@ -18,4 +18,13 @@ object MoocHelper {
     suspend fun getCourseTests(courseId: String): List<MoocTest> {
         return repository.getCourseTestsDirect(courseId)
     }
+
+    /**
+     * 清理 MOOC 本地会话缓存。
+     *
+     * 可在切换账号、密码更新或需要强制重新登录 MOOC 时调用。
+     */
+    suspend fun clearMoocLocalSession() {
+        repository.clearMoocLocalSession()
+    }
 }

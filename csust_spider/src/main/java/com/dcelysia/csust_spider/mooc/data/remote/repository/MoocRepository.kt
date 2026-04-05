@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import org.jsoup.Jsoup
-import java.util.regex.Pattern
 
 class MoocRepository private constructor() {
     companion object {
@@ -29,6 +28,16 @@ class MoocRepository private constructor() {
     private val api by lazy { RetrofitUtils.instanceMooc.create(MoocApi::class.java) }
     private val ssoAuthApi by lazy { RetrofitUtils.instanceSSOAuth.create(SSOAuthApi::class.java) }
     private val ssoEhallApi by lazy { RetrofitUtils.instanceSSOEhall.create(SSOEhallApi::class.java) }
+
+    /**
+     * 清理 MOOC 相关的本地会话数据。
+     *
+     * 主要用于切换学号、密码变更或检测到 Cookie 脏数据时，主动清空
+     * `PersistentCookieJar` 持久化的 SSO/MOOC Cookie，并断开现有连接池。
+     */
+    suspend fun clearMoocLocalSession() {
+        RetrofitUtils.ClearClient("moocClient")
+    }
 
     private fun isLoginRequired(response: String): Boolean {
         return response.contains("<TITLE>错误！</TITLE>") || response.contains("请登录！")
