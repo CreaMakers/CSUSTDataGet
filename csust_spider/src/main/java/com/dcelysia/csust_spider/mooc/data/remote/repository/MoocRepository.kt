@@ -395,8 +395,8 @@ class MoocRepository private constructor() {
             return@flow
         }
 
-        val html = response.body()
-        if (html.isNullOrEmpty()) {
+        val html = response.body().orEmpty()
+        if (html.isBlank()) {
             emit(Resource.Error("网络错误"))
             return@flow
         }
@@ -408,23 +408,48 @@ class MoocRepository private constructor() {
             return@flow
         }
 
-        val courseNamesContainer = reminderElement.getElementsByTag("li").firstOrNull()
-        if (courseNamesContainer == null) {
+        val ulElements = reminderElement.select("ul")
+        Log.d(TAG, "待完成作业解析: reminder ul 数量=${ulElements.size}")
+        if (ulElements.isEmpty()) {
             emit(Resource.Success(emptyList()))
             return@flow
         }
 
-        val courseNameElements = courseNamesContainer.select("li > ul > li > a")
+        val pendingTitle = "有待提交作业"
         val courseNames = mutableListOf<PendingAssignmentCourse>()
+        var matchedUlCount = 0
 
-        for (courseNameElement in courseNameElements) {
-            val id = courseNameElement.attr("onclick")
-                .replace("window.open('./lesson/enter_course.jsp?lid=", "")
-                .replace("&t=hw','manage_course')", "")
-            val courseName = courseNameElement.text().trim()
-            courseNames.add(PendingAssignmentCourse(id, courseName))
+        for ((index, ul) in ulElements.withIndex()) {
+            val ulText = ul.text().trim()
+            if (!ulText.contains(pendingTitle)) {
+                Log.d(TAG, "待完成作业解析: 跳过 ul[$index]，不包含关键字")
+                continue
+            }
+
+            matchedUlCount++
+            val courseAnchors = ul.select("a[onclick*=enter_course.jsp][onclick*=t=hw]")
+            Log.d(TAG, "待完成作业解析: 命中 ul[$index]，课程 a 数量=${courseAnchors.size}")
+
+            for (a in courseAnchors) {
+                val onclick = a.attr("onclick")
+                val id = Regex("""lid=([^&'"]+)""")
+                    .find(onclick)
+                    ?.groupValues
+                    ?.getOrNull(1)
+                    .orEmpty()
+                val name = a.text().trim()
+
+                if (id.isBlank() || name.isBlank()) {
+                    Log.d(TAG, "待完成作业解析: 跳过无效课程链接 onclick=$onclick")
+                    continue
+                }
+
+                courseNames.add(PendingAssignmentCourse(id, name))
+            }
         }
-        emit(Resource.Success(courseNames.toList()))
+
+        Log.d(TAG, "待完成作业解析: 命中 ul 数量=$matchedUlCount，解析课程数量=${courseNames.size}")
+        emit(Resource.Success(courseNames.distinctBy { it.id }))
     }.catch { e ->
         e.printStackTrace()
         Log.e("MoocRepository", "获取待完成作业课程失败: ${e.message}")
