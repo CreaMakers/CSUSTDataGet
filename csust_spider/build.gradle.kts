@@ -44,6 +44,8 @@ dependencies {
     implementation(libs.jsoup)
     //MMKV
     implementation(libs.mmkv)
+    //FastKv
+    implementation(libs.fastkv)
     // Gson
     implementation(libs.gson)
     implementation(libs.mmkv)
