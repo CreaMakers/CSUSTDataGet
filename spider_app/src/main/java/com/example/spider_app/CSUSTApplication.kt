@@ -1,12 +1,12 @@
 package com.example.spider_app
 
 import android.app.Application
-import com.tencent.mmkv.MMKV
+import com.dcelysia.csust_spider.core.MigratingKVStore
 
 class CSUSTApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        MMKV.initialize(this)
+        MigratingKVStore.initialize(this)
 
     }
 }

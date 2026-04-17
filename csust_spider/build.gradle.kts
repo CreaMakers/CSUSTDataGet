@@ -52,6 +52,8 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
+    testImplementation(kotlin("test"))
+    testImplementation(libs.junit)
 }
 publishing{
     publications{

@@ -4,7 +4,6 @@ import android.util.Log
 import com.dcelysia.csust_spider.education.data.remote.EducationData
 import com.dcelysia.csust_spider.education.data.remote.services.AuthService
 import com.dcelysia.csust_spider.mooc.data.remote.repository.MoocRepository
-import com.tencent.mmkv.MMKV
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.firstOrNull
@@ -18,7 +17,7 @@ import okhttp3.ResponseBody.Companion.toResponseBody
 //判断条件：mmkv中存在cookie但是返回的html却是登录页面，就进行登录重试
 //如果重试后仍然不行就要抛出异常
 class NetworkRetryInterceptor(
-    private val mmkv: MMKV,
+    private val kvStore: MigratingKV,
     private val key: String
 ) : Interceptor {
 
@@ -27,20 +26,20 @@ class NetworkRetryInterceptor(
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
         val originalResponse = chain.proceed(request)
-        val responseBodyString = originalResponse.body?.string().orEmpty()
+        val responseBodyString = originalResponse.body.string()
         Log.d(TAG,responseBodyString.contains("用户登录").toString())
-        Log.d(TAG, MMKVUtil.hasNonEmptyString(mmkv,key).toString())
-        Log.d(TAG, MMKVUtil.hasKey(mmkv,key).toString())
-        Log.d(TAG, MMKVUtil.hasAnyKey(mmkv).toString())
+        Log.d(TAG, MMKVUtil.hasNonEmptyString(kvStore,key).toString())
+        Log.d(TAG, MMKVUtil.hasKey(kvStore,key).toString())
+        Log.d(TAG, MMKVUtil.hasAnyKey(kvStore).toString())
         // 判断是否跳转到登录页（cookie 过期）
-        if (responseBodyString.contains("用户登录") && MMKVUtil.hasAnyKey(mmkv)) {
+        if (responseBodyString.contains("用户登录") && MMKVUtil.hasAnyKey(kvStore)) {
             Log.d(TAG, "检测到登录页面，cookie 可能过期，开始自动登录流程...")
 
             // 阻塞登录流程（放在IO线程）
             val reloginSuccess = runBlocking(Dispatchers.IO) {
                 try {
                     Log.d(TAG,"网络库得到的账号密码：${EducationData.studentId},${EducationData.studentPassword}")
-                    mmkv.clearAll()
+                    kvStore.clearAll()
                     val ssoResult = MoocRepository.instance
                         .login(EducationData.studentId, EducationData.studentPassword)
                         .filter { it !is Resource.Loading }
@@ -64,17 +63,17 @@ class NetworkRetryInterceptor(
             if (reloginSuccess) {
                 Log.d(TAG, "重新登录成功，重试原始请求...")
                 val retryResponse = chain.proceed(request)
-                val retryBodyString = retryResponse.body?.string().orEmpty()
+                val retryBodyString = retryResponse.body.string()
             //重建响应体
                 return retryResponse.newBuilder()
-                    .body(retryBodyString.toResponseBody(retryResponse.body?.contentType()))
+                    .body(retryBodyString.toResponseBody(retryResponse.body.contentType()))
                     .build()
             }
         }
 
         // 未触发重试或重试失败
         return originalResponse.newBuilder()
-            .body(responseBodyString.toResponseBody(originalResponse.body?.contentType()))
+            .body(responseBodyString.toResponseBody(originalResponse.body.contentType()))
             .build()
     }
 }

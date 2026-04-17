@@ -2,9 +2,9 @@ package com.dcelysia.csust_spider.mooc.cookie
 
 import android.content.Context
 import android.util.Log
+import com.dcelysia.csust_spider.core.MigratingKVStore
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.tencent.mmkv.MMKV
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -33,22 +33,11 @@ class PersistentCookieJar private constructor() : CookieJar {
         val instance by lazy { PersistentCookieJar() }
 
         fun initialize(context: Context) {
-            try {
-                MMKV.initialize(context)
-            } catch (t: Throwable) {
-                Log.w(TAG, "MMKV.initialize failed", t)
-            }
+            MigratingKVStore.initialize(context)
         }
     }
 
-    private val mmkv by lazy {
-        try {
-            MMKV.mmkvWithID(MMKV_ID, MMKV.MULTI_PROCESS_MODE)
-        } catch (t: Throwable) {
-            Log.w(TAG, "mmkvWithID failed, fallback to default", t)
-            MMKV.defaultMMKV()
-        }
-    }
+    private val kvStore by lazy { MigratingKVStore.get(MMKV_ID) }
 
     override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
         val host = url.host
@@ -61,14 +50,14 @@ class PersistentCookieJar private constructor() : CookieJar {
         memoryCache.compute(host) { _, existing ->
             val base = existing?.filter { it.expiresAt > now }?.toMutableList()
                 ?: run {
-                    val json = mmkv.decodeString(host)
+                    val json = kvStore.getString(host)
                     if (json != null) {
                         parseCookiesFromJson(host, json, now).also { loaded ->
-                            Log.d(TAG, "saveFromResponse: Loaded ${loaded.size} cookies from MMKV for host: $host")
-                            loaded.forEach { Log.d(TAG, "saveFromResponse: loaded from MMKV: ${formatCookie(it)}") }
+                            Log.d(TAG, "saveFromResponse: Loaded ${loaded.size} cookies from KV for host: $host")
+                            loaded.forEach { Log.d(TAG, "saveFromResponse: loaded from KV: ${formatCookie(it)}") }
                         }.toMutableList()
                     } else {
-                        Log.d(TAG, "saveFromResponse: No cookies found in MMKV for host: $host")
+                        Log.d(TAG, "saveFromResponse: No cookies found in KV for host: $host")
                         mutableListOf()
                     }
                 }
@@ -97,15 +86,15 @@ class PersistentCookieJar private constructor() : CookieJar {
         val now = System.currentTimeMillis()
 
         val list = memoryCache.computeIfAbsent(host) {
-            val json = mmkv.decodeString(host)
-            Log.d(TAG, "loadForRequest: Reading from MMKV for host: $host, json: $json")
+            val json = kvStore.getString(host)
+            Log.d(TAG, "loadForRequest: Reading from KV for host: $host, json: $json")
             if (json != null) {
                 parseCookiesFromJson(host, json, now).also { cookies ->
-                    Log.d(TAG, "loadForRequest: Loaded ${cookies.size} cookies from MMKV for host: $host")
+                    Log.d(TAG, "loadForRequest: Loaded ${cookies.size} cookies from KV for host: $host")
                     cookies.forEach { Log.d(TAG, "loadForRequest: loaded: ${formatCookie(it)}") }
                 }
             } else {
-                Log.d(TAG, "loadForRequest: No cookies found in MMKV for host: $host")
+                Log.d(TAG, "loadForRequest: No cookies found in KV for host: $host")
                 emptyList()
             }
         }
@@ -124,7 +113,7 @@ class PersistentCookieJar private constructor() : CookieJar {
             val type = object : TypeToken<List<SerializableCookie>>() {}.type
             val serializableCookies: List<SerializableCookie>? = gson.fromJson(json, type)
             if (serializableCookies.isNullOrEmpty()) {
-                mmkv.removeValueForKey(host)
+                kvStore.removeValueForKey(host)
                 return emptyList()
             }
             serializableCookies.mapNotNull { sc ->
@@ -134,7 +123,7 @@ class PersistentCookieJar private constructor() : CookieJar {
             }.filter { it.expiresAt > now }
         }.onFailure {
             Log.e(TAG, "parseCookiesFromJson: failed to parse cookies for host=$host, clearing cache", it)
-            mmkv.removeValueForKey(host)
+            kvStore.removeValueForKey(host)
         }.getOrElse { emptyList() }
     }
 
@@ -168,11 +157,11 @@ class PersistentCookieJar private constructor() : CookieJar {
                 hostOnly = it.hostOnly
             )
         }
-        Log.d(TAG, "persistHost: Saving ${toSave.size} valid cookies to MMKV for host: $host")
+        Log.d(TAG, "persistHost: Saving ${toSave.size} valid cookies to KV for host: $host")
         toSave.forEach { sc ->
             sc.toOkHttpCookieOrNull()?.let { Log.d(TAG, "persistHost: saving: ${formatCookie(it)}") }
         }
-        mmkv.encode(host, gson.toJson(toSave))
+        kvStore.putString(host, gson.toJson(toSave))
         pendingJobs.remove(host)
     }
 
@@ -185,8 +174,8 @@ class PersistentCookieJar private constructor() : CookieJar {
             list.forEach { Log.d(TAG, "clear: clearing cookie: ${formatCookie(it)}") }
         }
         memoryCache.clear()
-        mmkv.clearAll()
-        Log.d(TAG, "clear: Cleared MMKV and memory cache")
+        kvStore.clearAll()
+        Log.d(TAG, "clear: Cleared KV store and memory cache")
     }
 
     fun destroy() {

@@ -4,7 +4,6 @@ package com.dcelysia.csust_spider.core
 import com.dcelysia.csust_spider.core.RetrofitUtils.EducationClientForLogin
 import com.dcelysia.csust_spider.core.RetrofitUtils.totalCookieJar
 import com.dcelysia.csust_spider.mooc.cookie.PersistentCookieJar
-import com.tencent.mmkv.MMKV
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -45,7 +44,7 @@ object RetrofitUtils {
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
-            .addInterceptor ( NetworkRetryInterceptor(MMKV.mmkvWithID(MMKV_ID),MMKV_ID) )
+            .addInterceptor ( NetworkRetryInterceptor(MigratingKVStore.get(MMKV_ID),MMKV_ID) )
             .addInterceptor (NetworkLogger.getLoggingInterceptor() )
             .cookieJar(totalCookieJar)
             .build()
