@@ -29,6 +29,17 @@
         android:layout_height="wrap_content"
         android:text="kebiao" />
 
+    <Button
+        android:id="@+id/dianliang"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="电量" />
+
+    <TextView
+        android:id="@+id/tv_dl"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="1111111"/>
 
 
 </LinearLayout>

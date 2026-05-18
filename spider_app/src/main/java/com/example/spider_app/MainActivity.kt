@@ -73,6 +73,21 @@ class MainActivity : AppCompatActivity() {
                 Log.d(TAG,"grades:${rl}")
             }
         }
+        binding.dianliang.setOnClickListener {
+            CoroutineScope(Dispatchers.IO).launch {
+                val dianliang = CampusCardHelper.queryElectricity("云塘校区","至诚轩五栋A区","a211")
+                Log.d(TAG,"电量：”${dianliang}")
+                try {
+                    Log.d(TAG,"A区：${CampusCardHelper.buildingFallbackMap["至诚轩5栋A区"]}")
+                }catch (e: Exception){
+                    Log.d(TAG, CampusCardHelper.buildingFallbackMap.toString())
+                }
+                withContext(Dispatchers.Main){
+                    binding.tvDl.text =  dianliang.toString()
+                }
+            }
+        }
+
         binding.course.setOnClickListener {
             CoroutineScope(Dispatchers.IO).launch {
                 val course = EducationHelper.getCourseScheduleByTerm("","2025-2026-1")
