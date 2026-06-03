@@ -2,7 +2,7 @@ package com.example.spider_app
 
 import android.os.Bundle
 import android.util.Log
-import android.widget.Button
+import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -30,20 +30,25 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(binding.root)
-        val loginButton = findViewById<Button>(R.id.loginButton)
-        loginButton.setOnClickListener {
-            lifecycleScope
+        binding.loginButton.setOnClickListener {
+            val username = binding.usernameInput.text.toString().trim()
+            val password = binding.passwordInput.text.toString()
+            if (username.isBlank() || password.isBlank()) {
+                Toast.makeText(this, R.string.login_input_required, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
             CoroutineScope(Dispatchers.IO).launch {
                 RetrofitUtils.ClearClient("moocClient")
                 RetrofitUtils.ClearClient("EducationClient")
                 try {
-                    val loginResult = MoocRepository.instance.login("202411070108","%*J!64|5@SEty9s!")
+                    val loginResult = MoocRepository.instance.login(username, password)
                     .filter { it !is Resource.Loading }
                     .first()
                     if(loginResult is Resource.Error){
                         Log.d(TAG,"登陆失败, ${loginResult.msg}")
                     }
-                    val ssoResult = AuthService.login("202411070108", "%*J!64|5@SEty9s!")
+                    val ssoResult = AuthService.login(username, password)
                     val course = EducationHelper.getCourseScheduleByTerm("","2025-2026-1")
                     Log.d(TAG,"course:${course}")
                     if (ssoResult&&(loginResult is Resource.Success)){

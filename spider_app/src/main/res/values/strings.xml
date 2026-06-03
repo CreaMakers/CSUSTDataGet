@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">spider_app</string>
+    <string name="login_title">校园数据测试</string>
+    <string name="username_hint">账号</string>
+    <string name="password_hint">密码</string>
+    <string name="login">登录</string>
+    <string name="query_course">查询课表</string>
+    <string name="query_electricity">查询电量</string>
+    <string name="result_placeholder">结果会显示在这里</string>
+    <string name="login_input_required">请输入账号和密码</string>
 </resources>
