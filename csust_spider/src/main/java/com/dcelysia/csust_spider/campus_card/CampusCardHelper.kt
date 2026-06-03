@@ -1,11 +1,12 @@
 package com.example.csustdataget.CampusCard
 
 import android.util.Log
-import com.example.csustdataget.CampusCard.model.BuildingResponse
-import com.example.csustdataget.CampusCard.model.QueryBuildingRequest
-import com.example.csustdataget.CampusCard.model.QueryEleRequest
+import com.example.csustdataget.CampusCard.model.ThirdDataResponse
+import com.example.csustdataget.CampusCard.model.ThirdDataRoomPowerInfo
+import com.example.csustdataget.CampusCard.model.ThirdDataSelectItem
 import com.example.csustdataget.CampusCard.repository.CampusCardRepository
 import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -15,13 +16,27 @@ object CampusCardHelper {
         val id: String
     )
 
+    data class RoomInfo(
+        val name: String,
+        val id: String,
+        val building: BuildingInfo
+    )
+
+    private data class CampusInfo(
+        val displayName: String,
+        val campusId: String,
+        val feeItemId: String
+    )
+
     private val json by lazy { Gson() }
     private const val TAG = "CampusCardHelper"
-    private const val DEFAULT_ACCOUNT = "000001"
     private val repository by lazy { CampusCardRepository.instance }
-    private val campusIdMap = mapOf(
-        "金盆岭校区" to "0030000000002502",
-        "云塘校区" to "0030000000002501"
+    private var token: String? = null
+    private val campusInfoMap = mapOf(
+        "金盆岭校区" to CampusInfo(displayName = "金盆岭校区", campusId = "22", feeItemId = "468"),
+        "金盆岭" to CampusInfo(displayName = "金盆岭校区", campusId = "22", feeItemId = "468"),
+        "云塘校区" to CampusInfo(displayName = "云塘校区", campusId = "1", feeItemId = "448"),
+        "云塘" to CampusInfo(displayName = "云塘校区", campusId = "1", feeItemId = "448")
     )
     val buildingFallbackMap = mutableMapOf(
         "西苑2栋" to "9",
@@ -93,20 +108,37 @@ object CampusCardHelper {
         "至诚轩4栋A区" to "43"
     )
 
+    suspend fun syncToken(ticket: String) {
+        token = repository.exchangeTicketForToken(ticket)
+    }
+
+    fun clearCampusCardToken() {
+        token = null
+    }
+
+    private suspend fun ensureToken(): String? {
+        token?.takeIf { it.isNotBlank() }?.let { return it }
+        val ticket = repository.loginToCampusCardTicket() ?: return null
+        return repository.exchangeTicketForToken(ticket).also { token = it }
+    }
+
     suspend fun getBuildings(campusName: String): List<BuildingInfo> {
-        val campusId = campusIdMap[campusName] ?: return emptyList()
+        val campus = campusInfoMap[campusName] ?: return emptyList()
         return try {
             withContext(Dispatchers.IO) {
-                val requestObj = mapOf(
-                    "query_elec_building" to QueryBuildingRequest(
-                        aid = campusId,
-                        account = DEFAULT_ACCOUNT,
-                        area = QueryBuildingRequest.Area(area = campusName, areaname = campusName)
+                val campusCardToken = ensureToken() ?: return@withContext emptyList()
+                val response = repository.getBuildingsV2(
+                    token = campusCardToken,
+                    parameters = mapOf(
+                        "feeitemid" to campus.feeItemId,
+                        "type" to "select",
+                        "level" to "1",
+                        "xiaoqu_id" to campus.campusId
                     )
                 )
-                val jsonDataString = json.toJson(requestObj)
-                val response = repository.getBuildings(jsonDataString)
-                parseBuildingResponse(response).onEach {
+                parseSelectItemsResponse(response).map {
+                    BuildingInfo(name = it.name, id = it.value)
+                }.onEach {
                     syncBuildingId(it.name, it.id)
                 }
             }
@@ -170,12 +202,35 @@ object CampusCardHelper {
 
     internal fun parseBuildingResponse(text: String?): List<BuildingInfo> {
         if (text.isNullOrBlank()) return emptyList()
-        val response = runCatching {
-            json.fromJson(text, BuildingResponse::class.java)
-        }.getOrNull() ?: return emptyList()
-        return response.queryElecBuilding.buildingtab
-            ?.map { BuildingInfo(name = it.building, id = it.buildingid) }
-            .orEmpty()
+        return parseSelectItemsResponse(text).map { BuildingInfo(name = it.name, id = it.value) }
+    }
+
+    suspend fun getRooms(campusName: String, buildingName: String): List<RoomInfo> {
+        val campus = campusInfoMap[campusName] ?: return emptyList()
+        return try {
+            withContext(Dispatchers.IO) {
+                val campusCardToken = ensureToken() ?: return@withContext emptyList()
+                val building = getBuildings(campusName).firstOrNull {
+                    normalizeBuildingName(it.name) == normalizeBuildingName(buildingName)
+                } ?: return@withContext emptyList()
+                val response = repository.getRooms(
+                    token = campusCardToken,
+                    parameters = mapOf(
+                        "feeitemid" to campus.feeItemId,
+                        "type" to "select",
+                        "level" to "2",
+                        "xiaoqu_id" to campus.campusId,
+                        "loudong_id" to building.id
+                    )
+                )
+                parseSelectItemsResponse(response).map {
+                    RoomInfo(name = it.name, id = it.value, building = building)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "getRooms failed for $campusName / $buildingName", e)
+            emptyList()
+        }
     }
 
     /**
@@ -188,54 +243,40 @@ object CampusCardHelper {
         buildingName: String,
         roomId: String
     ): Double? {
-        val campusId = campusIdMap[campusName]
-        if (campusId.isNullOrBlank()) {
+        val campus = campusInfoMap[campusName]
+        if (campus == null) {
             Log.e(TAG, "queryElectricity: invalid campus or building -> $campusName / $buildingName")
             return null
         }
         return try {
             withContext(Dispatchers.IO) {
-                if (shouldUseDynamicBuildingLookupOnly(buildingName)) {
-                    val dynamicBuildingId = resolveDynamicBuildingId(campusName, buildingName)
-                    if (dynamicBuildingId.isNullOrBlank()) {
-                        Log.e(TAG, "queryElectricity: dynamic building lookup failed -> $campusName / $buildingName")
-                        return@withContext null
-                    }
-                    return@withContext attemptQueryElectricity(
-                        campusId = campusId,
-                        campusName = campusName,
-                        buildingId = dynamicBuildingId,
-                        roomId = roomId
-                    )
+                val campusCardToken = ensureToken()
+                if (campusCardToken.isNullOrBlank()) {
+                    Log.e(TAG, "queryElectricity: campus card login failed")
+                    return@withContext null
                 }
-
-                val fallbackBuildingId = resolveFallbackBuildingId(buildingName)
-                val initialBuildingId = fallbackBuildingId ?: resolveDynamicBuildingId(campusName, buildingName)
-                if (initialBuildingId.isNullOrBlank()) {
+                val building = getBuildings(campusName).firstOrNull {
+                    normalizeBuildingName(it.name) == normalizeBuildingName(buildingName)
+                }
+                if (building == null) {
                     Log.e(TAG, "queryElectricity: initial building lookup failed -> $campusName / $buildingName")
                     return@withContext null
                 }
 
-                val initialResult = attemptQueryElectricity(
-                    campusId = campusId,
-                    campusName = campusName,
-                    buildingId = initialBuildingId,
-                    roomId = roomId
-                )
-                if (initialResult != null) {
-                    return@withContext initialResult
+                val room = getRooms(campusName, building.name).firstOrNull {
+                    normalizeRoomName(it.name) == normalizeRoomName(roomId) ||
+                            normalizeRoomName(it.id) == normalizeRoomName(roomId)
                 }
-
-                val dynamicBuildingId = resolveDynamicBuildingId(campusName, buildingName)
-                if (dynamicBuildingId.isNullOrBlank() || dynamicBuildingId == initialBuildingId) {
+                if (room == null) {
+                    Log.e(TAG, "queryElectricity: room lookup failed -> $campusName / ${building.name} / $roomId")
                     return@withContext null
                 }
-                Log.d(TAG, "queryElectricity: retry with dynamic building id -> $buildingName / $dynamicBuildingId")
+
                 attemptQueryElectricity(
-                    campusId = campusId,
-                    campusName = campusName,
-                    buildingId = dynamicBuildingId,
-                    roomId = roomId
+                    token = campusCardToken,
+                    campus = campus,
+                    buildingId = building.id,
+                    roomId = room.id
                 )
             }
         } catch (e: Exception) {
@@ -245,28 +286,60 @@ object CampusCardHelper {
     }
 
     private suspend fun attemptQueryElectricity(
-        campusId: String,
-        campusName: String,
+        token: String,
+        campus: CampusInfo,
         buildingId: String,
         roomId: String
     ): Double? {
-        val requestObj = mapOf(
-            "query_elec_roominfo" to QueryEleRequest(
-                aid = campusId,
-                account = DEFAULT_ACCOUNT,
-                room = QueryEleRequest.Room(roomid = roomId, room = roomId),
-                floor = QueryEleRequest.Floor(floorid = "", floor = ""),
-                area = QueryEleRequest.Area(area = campusName, areaname = campusName),
-                building = QueryEleRequest.Building(buildingid = buildingId, building = "")
+        val response = repository.getElectricityV2(
+            token = token,
+            parameters = mapOf(
+                "feeitemid" to campus.feeItemId,
+                "type" to "IEC",
+                "level" to "3",
+                "xiaoqu_id" to campus.campusId,
+                "loudong_id" to buildingId,
+                "room_id" to roomId
             )
         )
-        val jsonDataString = json.toJson(requestObj)
-        val response = repository.getElectricity(jsonDataString)
         Log.d(TAG, response)
-        if (response.contains("无法获取房间信息")) {
+        val powerInfo = parseRoomPowerInfoResponse(response) ?: return extractElectricityFromString(response)
+        val allValue = powerInfo.allAmp?.toDoubleOrNull()
+        val usedValue = powerInfo.usedAmp?.toDoubleOrNull()
+        if (allValue == null || usedValue == null) {
+            return extractElectricityFromString(response)
+        }
+        return allValue - usedValue
+    }
+
+    private fun parseSelectItemsResponse(text: String?): List<ThirdDataSelectItem> {
+        if (text.isNullOrBlank()) return emptyList()
+        val type = object : TypeToken<ThirdDataResponse<List<ThirdDataSelectItem>>>() {}.type
+        val response = runCatching {
+            json.fromJson<ThirdDataResponse<List<ThirdDataSelectItem>>>(text, type)
+        }.getOrNull() ?: return emptyList()
+        if (response.code == 401) {
+            token = null
+            return emptyList()
+        }
+        return response.map?.data.orEmpty()
+    }
+
+    private fun parseRoomPowerInfoResponse(text: String?): ThirdDataRoomPowerInfo? {
+        if (text.isNullOrBlank()) return null
+        val type = object : TypeToken<ThirdDataResponse<ThirdDataRoomPowerInfo>>() {}.type
+        val response = runCatching {
+            json.fromJson<ThirdDataResponse<ThirdDataRoomPowerInfo>>(text, type)
+        }.getOrNull() ?: return null
+        if (response.code == 401) {
+            token = null
             return null
         }
-        return extractElectricityFromString(response)
+        return response.map?.data
+    }
+
+    private fun normalizeRoomName(roomName: String): String {
+        return roomName.trim().lowercase()
     }
 
     fun extractElectricityFromString(text: String?): Double? {
