@@ -9,6 +9,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.math.round
 
 object CampusCardHelper {
     data class BuildingInfo(
@@ -309,7 +310,7 @@ object CampusCardHelper {
         if (allValue == null || usedValue == null) {
             return extractElectricityFromString(response)
         }
-        return allValue - usedValue
+        return roundToTwoDecimals(allValue - usedValue)
     }
 
     private fun parseSelectItemsResponse(text: String?): List<ThirdDataSelectItem> {
@@ -357,7 +358,7 @@ object CampusCardHelper {
             val matched = Regex(pattern, RegexOption.IGNORE_CASE).find(text)
             val captured = matched?.groups?.get(1)?.value
             if (!captured.isNullOrEmpty()) {
-                return captured.toDoubleOrNull()
+                return captured.toDoubleOrNull()?.let(::roundToTwoDecimals)
             }
         }
 
@@ -367,5 +368,10 @@ object CampusCardHelper {
             ?.get(1)
             ?.value
             ?.toDoubleOrNull()
+            ?.let(::roundToTwoDecimals)
+    }
+
+    private fun roundToTwoDecimals(value: Double): Double {
+        return round(value * 100) / 100
     }
 }
