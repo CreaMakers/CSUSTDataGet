@@ -13,6 +13,7 @@ import com.dcelysia.csust_spider.education.data.remote.model.Course
 import com.dcelysia.csust_spider.education.data.remote.model.CourseGrade
 import com.dcelysia.csust_spider.education.data.remote.model.CourseGradeResponse
 import com.dcelysia.csust_spider.education.data.remote.model.CourseNature
+import com.dcelysia.csust_spider.education.data.remote.model.CourseScheduleData
 import com.dcelysia.csust_spider.education.data.remote.model.DayOfWeek
 import com.dcelysia.csust_spider.education.data.remote.model.DisplayMode
 import com.dcelysia.csust_spider.education.data.remote.model.GradeComponent
@@ -44,7 +45,7 @@ class EducationRepository private constructor() {
      * @param academicSemester The academic semester identifier
      * @return List of Course objects parsed from the HTML response
      */
-    suspend fun getCourseScheduleByTerm(week: String, academicSemester: String): Resource<List<Course>> {
+    suspend fun getCourseScheduleByTerm(week: String, academicSemester: String): Resource<CourseScheduleData> {
         return try {
             val response = courseScheduleApi.getCourseSchedule(week, academicSemester)
             if (!response.isSuccessful){
@@ -127,9 +128,9 @@ class EducationRepository private constructor() {
      * @param html The HTML response string from the course schedule API
      * @return List of Course objects parsed from the HTML
      */
-    fun parseCourseSchedule(html: String): Resource<List<Course>> {
+    fun parseCourseSchedule(html: String): Resource<CourseScheduleData> {
         val courses = mutableListOf<Course>()
-        
+        var remark = ""
         try {
             val document: Document = Jsoup.parse(html)
             
@@ -142,7 +143,26 @@ class EducationRepository private constructor() {
             
             // 查找所有课程内容div
             val courseDivs = document.select("div.kbcontent")
-            
+
+            // 解析备注信息（来自课表表格最后一行）
+
+            val kbTable = document.selectFirst("#kbtable")
+            if (kbTable != null) {
+                val rows = kbTable.select("tr")
+                if (rows.isNotEmpty()) {
+                    val lastRow = rows.last()
+                    val thText = lastRow?.select("th")?.firstOrNull()?.text()?.trim()
+                    if (thText?.contains("备注") == true) {
+                        val tdText = lastRow?.select("td")?.firstOrNull()?.text()?.trim() ?: ""
+                        remark = tdText.split(";")
+                            .map { it.trim() }
+                            .filter { it.isNotEmpty() }
+                            .joinToString("; ")
+                        Log.d(TAG,"备注:${remark}")
+                    }
+                }
+            }
+
             for (div in courseDivs) {
                 // 检查是否有分隔符 "---------------------"
                 val courseBlocks = div.html().split("---------------------")
@@ -199,7 +219,7 @@ class EducationRepository private constructor() {
             Log.e(TAG, "Error parsing course schedule HTML", e)
         }
         
-        return Resource.Success(courses)
+        return Resource.Success(CourseScheduleData(courses, remark))
     }
 
     /**

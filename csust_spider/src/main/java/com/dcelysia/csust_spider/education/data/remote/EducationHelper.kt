@@ -6,6 +6,7 @@ import com.dcelysia.csust_spider.education.data.remote.model.Campus
 import com.dcelysia.csust_spider.education.data.remote.model.Course
 import com.dcelysia.csust_spider.education.data.remote.model.CourseGradeResponse
 import com.dcelysia.csust_spider.education.data.remote.model.CourseNature
+import com.dcelysia.csust_spider.education.data.remote.model.CourseScheduleData
 import com.dcelysia.csust_spider.education.data.remote.model.DayOfWeek
 import com.dcelysia.csust_spider.education.data.remote.model.DisplayMode
 import com.dcelysia.csust_spider.education.data.remote.model.GradeDetailResponse
@@ -23,7 +24,7 @@ object EducationHelper {
      * @param academicSemester The academic semester identifier
      * @return Raw HTML string of the course schedule
      */
-    suspend fun getCourseScheduleByTerm(week: String, academicSemester: String): Resource<List<Course>> {
+    suspend fun getCourseScheduleByTerm(week: String, academicSemester: String): Resource<CourseScheduleData> {
         return try {
             // For backward compatibility, we still call the API but return the raw response
             // In a real implementation, you might want to store the raw response separately
@@ -41,7 +42,7 @@ object EducationHelper {
      * @param academicSemester The academic semester identifier
      * @return List of Course objects parsed from the course schedule
      */
-    suspend fun getParsedCourseScheduleByTerm(week: String, academicSemester: String): Resource<List<Course>> {
+    suspend fun getParsedCourseScheduleByTerm(week: String, academicSemester: String): Resource<CourseScheduleData> {
         return repository.getCourseScheduleByTerm(week, academicSemester)
     }
 

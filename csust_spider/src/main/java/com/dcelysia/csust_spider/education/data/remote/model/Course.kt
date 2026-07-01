@@ -9,5 +9,5 @@ data class Course(
     //周次（节次）
     val weeks: String,
     val classroom: String,
-    val weekday: String
+    val weekday: String,
 )

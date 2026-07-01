@@ -95,16 +95,11 @@ class MainActivity : AppCompatActivity() {
 
         binding.course.setOnClickListener {
             CoroutineScope(Dispatchers.IO).launch {
-                val course = EducationHelper.getCourseScheduleByTerm("","2025-2026-1")
-                Log.d(TAG,"course:${course}")
-            }
-            lifecycleScope.launch {
-                val queryElectricity =
-                    CampusCardHelper.queryElectricity("金盆岭校区", "西苑1栋", "229")
-                withContext(Dispatchers.Main) {
-                    binding.course.text = queryElectricity.toString()
+                val courseSchedule = EducationHelper.getCourseScheduleByTerm("","2025-2026-1")
+                withContext(Dispatchers.Main){
+                    binding.tvDl.text = courseSchedule.toString()
                 }
-                Log.d("queryElectricity", "onCreate: $queryElectricity")
+
             }
         }
         binding.termDetails.setOnClickListener {
