@@ -95,7 +95,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.course.setOnClickListener {
             CoroutineScope(Dispatchers.IO).launch {
-                val courseSchedule = EducationHelper.getCourseScheduleByTerm("","2025-2026-1")
+                val courseSchedule = EducationHelper.getCourseScheduleByTerm("","2025-2026-2")
                 withContext(Dispatchers.Main){
                     binding.tvDl.text = courseSchedule.toString()
                 }

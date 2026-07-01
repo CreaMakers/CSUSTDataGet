@@ -130,7 +130,7 @@ class EducationRepository private constructor() {
      */
     fun parseCourseSchedule(html: String): Resource<CourseScheduleData> {
         val courses = mutableListOf<Course>()
-        var remark = ""
+        var remark: List<String> = emptyList()
         try {
             val document: Document = Jsoup.parse(html)
             
@@ -157,8 +157,7 @@ class EducationRepository private constructor() {
                         remark = tdText.split(";")
                             .map { it.trim() }
                             .filter { it.isNotEmpty() }
-                            .joinToString("; ")
-                        Log.d(TAG,"备注:${remark}")
+                        Log.d(TAG,"备注:${remark.joinToString("; ")}")
                     }
                 }
             }
