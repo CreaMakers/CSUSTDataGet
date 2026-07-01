@@ -5,6 +5,7 @@ import com.dcelysia.csust_spider.core.Resource
 import com.dcelysia.csust_spider.core.RetrofitUtils
 import com.dcelysia.csust_spider.education.data.remote.api.CourseGradeApi
 import com.dcelysia.csust_spider.education.data.remote.api.CourseScheduleApi
+import com.dcelysia.csust_spider.education.data.remote.api.JxzlApi
 import com.dcelysia.csust_spider.education.data.remote.api.RelexClassroomInfoApi
 import com.dcelysia.csust_spider.education.data.remote.model.Campus
 import com.dcelysia.csust_spider.education.data.remote.error.EduHelperError
@@ -31,6 +32,7 @@ class EducationRepository private constructor() {
 
     private val courseScheduleApi by lazy { RetrofitUtils.instanceEduCourse.create(CourseScheduleApi::class.java) }
     private val courseGradeApi by lazy { RetrofitUtils.instanceScoreInquiry.create(CourseGradeApi::class.java) }
+    private val jxzlApi by lazy { RetrofitUtils.instanceEduCourse.create(JxzlApi::class.java) }
     private val relexClassroomInfoApi by lazy {
         RetrofitUtils.instanceRelexClassroomInfo.create(RelexClassroomInfoApi::class.java)
     }
@@ -60,7 +62,65 @@ class EducationRepository private constructor() {
             Resource.Error("发生错误")
         }
     }
-    
+
+
+    /**
+     * 获取学期首日（"第 1 周周一"锚点）。
+     *
+     * 对齐 iOS `SemesterService.getSemesterStartDate(academicYearSemester:)`：
+     * POST `/jsxsd/jxzl/jxzl_query`（表单 `xnxq01id` = 学期代码，若为空则当前默认学期），
+     * 解析返回 HTML 中 `#kbtable` 第二行第二列 `td` 的 `title` 属性（形如 `2026年09月07日`）。
+     *
+     * @param academicYearSemester 学年学期，格式为 `"2026-2027-1"`；传 `null`/空串使用当前默认学期
+     * @return 学期首日（`yyyy-MM-dd`，如 `"2026-09-07"`）
+     * @throws EduHelperError.SemesterStartDateRetrievalFailed 请求失败或页面结构异常
+     * @throws EduHelperError.NotLoggedIn 登录态失效
+     */
+    suspend fun getSemesterStartDate(academicYearSemester: String? = null): String {
+        Log.d(TAG, "getSemesterStartDate: querying jxzl for '${academicYearSemester ?: "default"}'")
+        val response = jxzlApi.queryJxzl(academicYearSemester.orEmpty())
+        if (!response.isSuccessful) {
+            Log.w(TAG, "getSemesterStartDate: http ${response.code()}")
+            throw EduHelperError.SemesterStartDateRetrievalFailed("网络请求失败：${response.code()}")
+        }
+        val html = response.body().orEmpty()
+        if (html.isBlank()) {
+            throw EduHelperError.SemesterStartDateRetrievalFailed("响应体为空")
+        }
+        if (html.contains("用户登录") || html.contains("统一身份认证")) {
+            Log.w(TAG, "getSemesterStartDate: hit login page")
+            throw EduHelperError.NotLoggedIn("登录状态已失效，请重新登录")
+        }
+        val document = Jsoup.parse(html)
+        val table = document.selectFirst("#kbtable")
+            ?: throw EduHelperError.SemesterStartDateRetrievalFailed("未找到学期首日表 #kbtable")
+        val rows = table.select("tr")
+        if (rows.size <= 1) {
+            throw EduHelperError.SemesterStartDateRetrievalFailed("学期首日表行数不足：${rows.size}")
+        }
+        val cols = rows[1].select("td")
+        if (cols.size <= 1) {
+            throw EduHelperError.SemesterStartDateRetrievalFailed("目标行列数不足：${cols.size}")
+        }
+        val startDateText = cols[1].attr("title").trim()
+        Log.d(TAG, "getSemesterStartDate: raw startDateText='$startDateText'")
+        if (startDateText.isBlank()) {
+            throw EduHelperError.SemesterStartDateRetrievalFailed("学期首日为空")
+        }
+        // 形如 "2026年09月07日" / "2026年9月7日" -> "yyyy-MM-dd"
+        val cleaned = startDateText.replace("日", "")
+        val matcher = java.util.regex.Pattern.compile("(\\d{4})年(\\d{1,2})月(\\d{1,2})").matcher(cleaned)
+        if (!matcher.find()) {
+            throw EduHelperError.SemesterStartDateRetrievalFailed("无法解析学期首日: $startDateText")
+        }
+        val (y, m) = matcher.group(1)!! to matcher.group(2)!!
+        val d = matcher.group(3)!!
+        val formatted = "%s-%02d-%02d".format(y, m.toInt(), d.toInt())
+        Log.d(TAG, "getSemesterStartDate: resolved startDate=$formatted")
+        return formatted
+    }
+
+
     /**
      * Parses HTML response into a List of Course objects
      * 

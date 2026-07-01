@@ -119,4 +119,23 @@ object EducationHelper {
             emptyList()
         }
     }
+
+
+    /**
+     * 获取学期首日（"第 1 周周一"锚点），用于校历未发布时兜底。
+     *
+     * 对齐 iOS `SemesterService.getSemesterStartDate(academicYearSemester:)`：
+     * 调教务系统 `/jsxsd/jxzl/jxzl_query` 并解析 `#kbtable`。
+     *
+     * @param academicYearSemester 学年学期，格式为 `"2026-2027-1"`；传 `null`/空串使用当前默认学期
+     * @return 学期首日（`yyyy-MM-dd`，如 `"2026-09-07"`）；失败返回 null，异常已记日志
+     */
+    suspend fun getSemesterStartDate(academicYearSemester: String? = null): String? {
+        return try {
+            repository.getSemesterStartDate(academicYearSemester)
+        } catch (e: Exception) {
+            Log.e(TAG, "getSemesterStartDate failed: ${e.message}")
+            null
+        }
+    }
 }

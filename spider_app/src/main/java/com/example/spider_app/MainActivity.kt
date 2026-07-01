@@ -107,6 +107,12 @@ class MainActivity : AppCompatActivity() {
                 Log.d("queryElectricity", "onCreate: $queryElectricity")
             }
         }
+        binding.termDetails.setOnClickListener {
+            CoroutineScope(Dispatchers.IO).launch {
+                val details = EducationHelper.getSemesterStartDate("2026-2027-1")
+                binding.tvDl.text = details
+            }
+        }
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)

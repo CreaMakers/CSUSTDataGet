@@ -6,6 +6,7 @@
     <string name="login">登录</string>
     <string name="query_course">查询课表</string>
     <string name="query_electricity">查询电量</string>
+    <string name="query_term_details">查询学期细节</string>
     <string name="result_placeholder">结果会显示在这里</string>
     <string name="login_input_required">请输入账号和密码</string>
 </resources>
