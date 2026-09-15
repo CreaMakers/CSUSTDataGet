@@ -37,6 +37,14 @@ interface SSOAuthApi {
         @Field("execution") execution: String
     ): Response<String>
 
+    @FormUrlEncoded
+    @POST("/authserver/login")
+    suspend fun continueLogin(
+        @Query("service") service: String,
+        @Field("_eventId") eventId: String = "continue",
+        @Field("execution") execution: String
+    ): Response<String>
+
     @GET("/authserver/logout")
     suspend fun logoutAuthserver(): Response<String>
 

@@ -1,10 +1,10 @@
 package com.dcelysia.csust_spider.education.data.remote.services
 
-import android.util.Log
 import com.dcelysia.csust_spider.core.RetrofitUtils
 import com.dcelysia.csust_spider.education.data.remote.api.EduLoginApi
 import com.dcelysia.csust_spider.education.data.remote.error.EduHelperError
 import com.dcelysia.csust_spider.mooc.data.remote.api.SSOAuthApi
+import org.jsoup.Jsoup
 import retrofit2.Response
 
 object AuthService {
@@ -25,10 +25,25 @@ object AuthService {
 
     suspend fun login(account: String, password: String): Boolean{
         Loginapi.login()
-        val response = ssoApi.loginToEducation()
-        val html = response.body().toString()
-        Log.d(TAG,html)
-        return !html.contains("请输入账号")
+        var response = ssoApi.loginToEducation()
+        val document = Jsoup.parse(response.body().orEmpty())
+        val continueForm = document.selectFirst("form#continue")
+        if (continueForm != null) {
+            val execution = continueForm
+                .selectFirst("input#execution, input[name=execution]")
+                ?.attr("value")
+                .orEmpty()
+            if (execution.isBlank()) return false
+            response = ssoApi.continueLogin(
+                service = "http://xk.csust.edu.cn/sso.jsp",
+                execution = execution
+            )
+        }
+        if (!response.isSuccessful) return false
+        val finalUrl = response.raw().request.url
+        if (finalUrl.host != "xk.csust.edu.cn") return false
+        val homeResponse = Loginapi.checkLoginStates()
+        return homeResponse.isSuccessful && !isLogin(homeResponse)
     }
 
     private fun isLogin(reponse: Response<String>): Boolean {
