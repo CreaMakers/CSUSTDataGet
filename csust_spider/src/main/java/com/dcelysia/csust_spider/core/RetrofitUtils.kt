@@ -155,4 +155,17 @@ object RetrofitUtils {
 
 
     }
+
+    suspend fun clearEducationAuthSession() {
+        EducationClientForService.connectionPool.evictAll()
+        EducationClientForService.cache?.evictAll()
+        EducationClientForLogin.connectionPool.evictAll()
+        EducationClientForLogin.cache?.evictAll()
+        totalCookieJar.clearHosts(
+            setOf(
+                "authserver.csust.edu.cn",
+                "xk.csust.edu.cn"
+            )
+        )
+    }
 }

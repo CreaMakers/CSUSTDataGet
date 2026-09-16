@@ -6,7 +6,7 @@ import com.tencent.mmkv.MMKV
 class CSUSTApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-//        MMKV.initialize(this)
+        MMKV.initialize(this)
 
     }
 }

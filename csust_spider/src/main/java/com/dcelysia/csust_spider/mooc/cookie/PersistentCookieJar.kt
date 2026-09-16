@@ -152,6 +152,7 @@ class PersistentCookieJar private constructor() : CookieJar {
         pendingJobs[host] = job
     }
 
+    @Synchronized
     private fun persistHost(host: String) {
         val list = memoryCache[host] ?: return
         Log.d(TAG, "persistHost: Persisting ${list.size} cookies for host: $host")
@@ -187,6 +188,15 @@ class PersistentCookieJar private constructor() : CookieJar {
         memoryCache.clear()
         mmkv.clearAll()
         Log.d(TAG, "clear: Cleared MMKV and memory cache")
+    }
+
+    @Synchronized
+    fun clearHosts(hosts: Set<String>) {
+        hosts.forEach { host ->
+            pendingJobs.remove(host)?.cancel()
+            memoryCache.remove(host)
+            mmkv.removeValueForKey(host)
+        }
     }
 
     fun destroy() {
