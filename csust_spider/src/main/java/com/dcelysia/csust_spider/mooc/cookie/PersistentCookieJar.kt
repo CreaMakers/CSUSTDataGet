@@ -32,6 +32,28 @@ class PersistentCookieJar private constructor() : CookieJar {
         private const val MMKV_ID = "csust_cookie_jar"
         val instance by lazy { PersistentCookieJar() }
 
+        /**
+         * 合并响应 cookie。
+         *
+         * 同名 cookie 只保留最新一个（不按 path 并存）：教务重新登录后新会话是
+         * JSESSIONID(path=/jsxsd)，登录前的旧会话是 JSESSIONID(path=/)，两条都命中
+         * /jsxsd/... 请求时会被一起发送，服务端只认第一个，可能取到已失效的旧会话并返回 404 空响应。
+         */
+        internal fun mergeCookies(
+            existing: List<Cookie>,
+            incoming: List<Cookie>,
+            now: Long
+        ): List<Cookie> {
+            val base = existing.filter { it.expiresAt > now }.toMutableList()
+            incoming.forEach { newCookie ->
+                base.removeAll { it.name == newCookie.name && it.domain == newCookie.domain }
+                if (newCookie.expiresAt > now) {
+                    base.add(newCookie)
+                }
+            }
+            return base.filter { it.expiresAt > now }
+        }
+
         fun initialize(context: Context) {
             try {
                 MMKV.initialize(context)
@@ -59,30 +81,20 @@ class PersistentCookieJar private constructor() : CookieJar {
         cookies.forEach { Log.d(TAG, "saveFromResponse: incoming: ${formatCookie(it)}") }
 
         memoryCache.compute(host) { _, existing ->
-            val base = existing?.filter { it.expiresAt > now }?.toMutableList()
-                ?: run {
-                    val json = mmkv.decodeString(host)
-                    if (json != null) {
-                        parseCookiesFromJson(host, json, now).also { loaded ->
-                            Log.d(TAG, "saveFromResponse: Loaded ${loaded.size} cookies from MMKV for host: $host")
-                            loaded.forEach { Log.d(TAG, "saveFromResponse: loaded from MMKV: ${formatCookie(it)}") }
-                        }.toMutableList()
-                    } else {
-                        Log.d(TAG, "saveFromResponse: No cookies found in MMKV for host: $host")
-                        mutableListOf()
+            val base = existing ?: run {
+                val json = mmkv.decodeString(host)
+                if (json != null) {
+                    parseCookiesFromJson(host, json, now).also { loaded ->
+                        Log.d(TAG, "saveFromResponse: Loaded ${loaded.size} cookies from MMKV for host: $host")
+                        loaded.forEach { Log.d(TAG, "saveFromResponse: loaded from MMKV: ${formatCookie(it)}") }
                     }
-                }
-
-            cookies.forEach { newCookie ->
-                base.removeAll {
-                    it.name == newCookie.name && it.domain == newCookie.domain && it.path == newCookie.path
-                }
-                if (newCookie.expiresAt > now) {
-                    base.add(newCookie)
+                } else {
+                    Log.d(TAG, "saveFromResponse: No cookies found in MMKV for host: $host")
+                    emptyList()
                 }
             }
 
-            val result = base.filter { it.expiresAt > now }
+            val result = mergeCookies(base, cookies, now)
             Log.d(TAG, "saveFromResponse: After merge cookies count=${result.size} for host=$host")
             result.forEach { Log.d(TAG, "saveFromResponse: merged: ${formatCookie(it)}") }
             result
@@ -110,10 +122,25 @@ class PersistentCookieJar private constructor() : CookieJar {
             }
         }
 
-        val validList = list.filter { it.expiresAt > now }
+        val validList = dedupeByName(list.filter { it.expiresAt > now })
         Log.d(TAG, "loadForRequest: Returning ${validList.size} valid cookies for host: $host")
         validList.forEach { Log.d(TAG, "loadForRequest: returning: ${formatCookie(it)}") }
         return validList
+    }
+
+    /**
+     * 同一 host 下同名 cookie 只保留最后一个。
+     *
+     * 历史数据里可能残留 JSESSIONID(path=/) + JSESSIONID(path=/jsxsd) 两条，
+     * 一起发送会让服务端取到错误会话，这里做一次兜底清理并回写。
+     */
+    private fun dedupeByName(cookies: List<Cookie>): List<Cookie> {
+        if (cookies.size < 2) return cookies
+        val result = LinkedHashMap<String, Cookie>()
+        cookies.forEach { result[it.name] = it }
+        if (result.size == cookies.size) return cookies
+        Log.d(TAG, "loadForRequest: 清理重复 cookie，${cookies.size} -> ${result.size}")
+        return result.values.toList()
     }
 
     /**

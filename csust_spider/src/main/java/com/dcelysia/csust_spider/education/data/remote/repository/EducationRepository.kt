@@ -20,6 +20,7 @@ import com.dcelysia.csust_spider.education.data.remote.model.GradeComponent
 import com.dcelysia.csust_spider.education.data.remote.model.GradeDetail
 import com.dcelysia.csust_spider.education.data.remote.model.GradeDetailResponse
 import com.dcelysia.csust_spider.education.data.remote.model.StudyMode
+import com.dcelysia.csust_spider.education.data.remote.services.AuthService
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import java.lang.Exception
@@ -53,7 +54,7 @@ class EducationRepository private constructor() {
             }
             val htmlBody = response.body().toString()
             Log.d(Companion.TAG,htmlBody)
-            if (response.code() == 200 && htmlBody.contains("用户登录")){
+            if (AuthService.isLoginPageHtml(htmlBody)) {
                 return Resource.Error("需要重新登录")
             }
 
@@ -88,7 +89,7 @@ class EducationRepository private constructor() {
         if (html.isBlank()) {
             throw EduHelperError.SemesterStartDateRetrievalFailed("响应体为空")
         }
-        if (html.contains("用户登录") || html.contains("统一身份认证")) {
+        if (AuthService.isLoginPageHtml(html)) {
             Log.w(TAG, "getSemesterStartDate: hit login page")
             throw EduHelperError.NotLoggedIn("登录状态已失效，请重新登录")
         }
@@ -269,7 +270,7 @@ class EducationRepository private constructor() {
         if (html.isBlank()) {
             throw EduHelperError.AvailableClassroomsRetrievalFailed("响应体为空")
         }
-        if (html.contains("用户登录") || html.contains("统一身份认证")) {
+        if (AuthService.isLoginPageHtml(html)) {
             throw EduHelperError.NotLoggedIn("登录状态已失效，请重新登录")
         }
 
@@ -337,7 +338,7 @@ class EducationRepository private constructor() {
             )
         }
 
-        if (html.contains("用户登录") || html.contains("统一身份认证")) {
+        if (AuthService.isLoginPageHtml(html)) {
             return CourseGradeResponse("403", "登录状态已失效，请重新登录", null)
         }
 
@@ -483,7 +484,7 @@ class EducationRepository private constructor() {
             )
         }
 
-        if (html.contains("用户登录") || html.contains("统一身份认证")) {
+        if (AuthService.isLoginPageHtml(html)) {
             return GradeDetailResponse("403", "登录状态已失效，请重新登录", null)
         }
 
