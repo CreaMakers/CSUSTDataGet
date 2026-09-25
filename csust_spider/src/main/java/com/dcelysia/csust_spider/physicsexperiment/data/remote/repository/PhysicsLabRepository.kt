@@ -159,7 +159,13 @@ class PhysicsLabRepository private constructor() {
         val pageUrl = first.raw().request.url.toString()
         val rows = parseTable(html).toMutableList()
 
-        val totalPages = TOTAL_PAGES_REGEX.find(html)?.groupValues?.get(1)?.toIntOrNull() ?: 1
+        val pages = TOTAL_PAGES_REGEX.find(html)?.groupValues?.get(1)?.toIntOrNull()
+        if (pages == null && html.contains(PAGER_TARGET)) {
+            // 有分页控件却读不出页数，多半是平台改了文案：这里会按单页处理并少数据，
+            // 所以留一条告警，避免将来变成静默失败。
+            Log.w(TAG, "分页文案未识别，按单页处理，数据可能不全")
+        }
+        val totalPages = pages ?: 1
         if (totalPages <= 1) return rows
         Log.d(TAG, "分页：共 $totalPages 页，开始回发取全")
 
