@@ -81,7 +81,4 @@ object PhysicsLabConfig {
 
     /** 平台登录时固定的用户类型：0=学生，1=老师，2=管理员。 */
     const val USER_TYPE = "0"
-
-    // TODO(二期)：校内直连。平台本体是 http://10.255.65.52/，在校园网内可直连并跳过
-    //  CAS 与 VPN 两步；但内网 IP 的 HTTPS 证书不匹配 IP、且 IP 可能漂移，暂不实现。
 }
