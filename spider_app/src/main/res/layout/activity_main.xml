@@ -50,6 +50,36 @@
             android:layout_marginTop="20dp"
             android:text="@string/login" />
 
+        <EditText
+            android:id="@+id/physicsPlatformPasswordInput"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="12dp"
+            android:hint="@string/physics_platform_password_hint"
+            android:inputType="textPassword"
+            android:singleLine="true" />
+
+        <Button
+            android:id="@+id/physicsLabButton"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="12dp"
+            android:text="@string/physics_lab_test" />
+
+        <Button
+            android:id="@+id/physicsTasksButton"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="12dp"
+            android:text="@string/physics_lab_tasks" />
+
+        <Button
+            android:id="@+id/physicsScoresButton"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="12dp"
+            android:text="@string/physics_lab_scores" />
+
         <Button
             android:id="@+id/course"
             android:layout_width="match_parent"

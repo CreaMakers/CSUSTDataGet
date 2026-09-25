@@ -9,4 +9,8 @@
     <string name="query_term_details">查询学期细节</string>
     <string name="result_placeholder">结果会显示在这里</string>
     <string name="login_input_required">请输入账号和密码</string>
+    <string name="physics_platform_password_hint">物理实验平台密码（留空则用上面的密码）</string>
+    <string name="physics_lab_test">物理实验：登录并探测会话</string>
+    <string name="physics_lab_tasks">物理实验：查询我的实验</string>
+    <string name="physics_lab_scores">物理实验：查询成绩</string>
 </resources>

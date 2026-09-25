@@ -4,6 +4,7 @@ package com.dcelysia.csust_spider.core
 import com.dcelysia.csust_spider.core.RetrofitUtils.EducationClientForLogin
 import com.dcelysia.csust_spider.core.RetrofitUtils.totalCookieJar
 import com.dcelysia.csust_spider.mooc.cookie.PersistentCookieJar
+import com.dcelysia.csust_spider.physicsexperiment.data.remote.PhysicsLabConfig
 import com.tencent.mmkv.MMKV
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
@@ -55,6 +56,28 @@ object RetrofitUtils {
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
+            .cookieJar(totalCookieJar)
+            .build()
+    }
+
+
+    val PhysicsLabClientForAuth: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .addInterceptor(NetworkLogger.getLoggingInterceptor())
+            .cookieJar(totalCookieJar)
+            .build()
+    }
+
+    val PhysicsLabClientForService: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .addInterceptor(PhysicsLabRetryInterceptor())
+            .addInterceptor(NetworkLogger.getLoggingInterceptor())
             .cookieJar(totalCookieJar)
             .build()
     }
@@ -127,6 +150,24 @@ object RetrofitUtils {
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }
+
+    val instancePhysicsLab: Retrofit by lazy {
+        Retrofit.Builder()
+            .baseUrl(PhysicsLabConfig.platformBaseUrl)
+            .client(PhysicsLabClientForAuth)
+            .addConverterFactory(ScalarsConverterFactory.create())
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    val instancePhysicsLabService: Retrofit by lazy {
+        Retrofit.Builder()
+            .baseUrl(PhysicsLabConfig.platformBaseUrl)
+            .client(PhysicsLabClientForService)
+            .addConverterFactory(ScalarsConverterFactory.create())
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
     val instanceRelexClassroomInfo: Retrofit by lazy {
         Retrofit.Builder()
             .baseUrl(EDUCA_LOGIN_URL)
@@ -167,5 +208,11 @@ object RetrofitUtils {
                 "xk.csust.edu.cn"
             )
         )
+    }
+
+    suspend fun clearPhysicsLabSession() {
+        PhysicsLabClientForAuth.connectionPool.evictAll()
+        PhysicsLabClientForAuth.cache?.evictAll()
+        totalCookieJar.clearHosts(setOf(PhysicsLabConfig.VPN_HOST))
     }
 }
