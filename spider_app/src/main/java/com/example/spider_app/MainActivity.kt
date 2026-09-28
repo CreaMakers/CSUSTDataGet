@@ -85,9 +85,10 @@ class MainActivity : AppCompatActivity() {
         binding.physicsLabButton.setOnClickListener {
             val username = binding.usernameInput.text.toString().trim()
             val authPassword = binding.passwordInput.text.toString()
-            // 平台密码留空时回退用上面的密码；实测两者常常不同，不同就在下面单独填
-            val platformPassword = binding.physicsPlatformPasswordInput.text.toString()
-                .ifBlank { authPassword }
+            // 平台密码留空时**不要覆盖**已保存的那个：实测平台密码与统一认证密码常常不同，
+            // 一旦被覆盖，平台会话过期后的自动续期就会一直用错密码（评审指出）。
+            // 只有用户明确填了新密码、或本地还没存过（首次使用）时才落盘。
+            val typedPlatformPassword = binding.physicsPlatformPasswordInput.text.toString()
 
             if (username.isBlank() || authPassword.isBlank()) {
                 Toast.makeText(this, R.string.login_input_required, Toast.LENGTH_SHORT).show()
@@ -98,7 +99,10 @@ class MainActivity : AppCompatActivity() {
                 // 正式 App 里这两项由"绑定学号"流程写入，demo 里手工塞一下
                 EducationData.studentId = username
                 EducationData.studentPassword = authPassword
-                PhysicsLabHelper.setPlatformPassword(platformPassword)
+                if (typedPlatformPassword.isNotBlank() || !PhysicsLabHelper.hasPlatformPassword) {
+                    // 明确填了就用填的；没填过才回退用统一认证密码（否则 demo 没法一键跑通）
+                    PhysicsLabHelper.setPlatformPassword(typedPlatformPassword.ifBlank { authPassword })
+                }
 
                 try {
                     PhysicsLabHelper.clearSession()   // 从干净状态开始，方便反复测试
