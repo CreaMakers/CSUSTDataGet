@@ -5,6 +5,8 @@ import com.dcelysia.csust_spider.education.data.remote.EducationData
 import com.dcelysia.csust_spider.physicsexperiment.data.remote.PhysicsLabConfig
 import com.dcelysia.csust_spider.physicsexperiment.data.remote.PhysicsLabData
 import com.dcelysia.csust_spider.physicsexperiment.data.remote.service.PhysicsLabAuthService
+import java.io.IOException
+import java.net.ProtocolException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
@@ -65,16 +67,33 @@ class PhysicsLabRetryInterceptor : Interceptor {
             return chain.proceed(request)
         }
 
-        val response = chain.proceed(request)
-        val body = response.body.string()
-        val contentType = response.body.contentType()
-
-        val loss = classify(response, body)
-        if (loss == null) {
-            return rebuild(response, body, contentType)
+        // 首次请求。网关会话失效时 `/http/<token>/…` 会 302 指回自身（实测），
+        // OkHttp 跟到重定向上限后抛 ProtocolException —— 这是"网关会话失效"的确定信号，
+        // 必须就地翻译成 [SessionLoss.VPN]，否则异常会直接穿出拦截器，
+        // 下面的 classify 与自动重登根本不会执行。
+        //
+        // ⚠️ 只有 ProtocolException 算会话失效：断网 / 超时 / 连接被拒这类普通 IOException
+        // 一律原样上抛。因为误判会触发重登，而重登会清掉用户会话（见 [performRelogin]），
+        // 等于把一次网络抖动升级成"必须重新绑定学号"。
+        var redirectLoop: ProtocolException? = null
+        val first = try {
+            val response = chain.proceed(request)
+            ConsumedResponse(response, response.body.string(), response.body.contentType())
+        } catch (e: ProtocolException) {
+            Log.w(TAG, "请求被网关重定向自环中断，判定网关会话失效：${e.message}")
+            redirectLoop = e
+            null
         }
 
-        Log.d(TAG, "检测到会话失效（$loss），落地=${response.request.url}")
+        // 拿不到响应体时按网关会话失效处理；否则用落地 URL 与正文判类型
+        val loss = if (first == null) {
+            SessionLoss.VPN
+        } else {
+            classify(first.response, first.body)
+                ?: return rebuild(first.response, first.body, first.contentType)
+        }
+
+        Log.d(TAG, "检测到会话失效（$loss），落地=${first?.response?.request?.url ?: "重定向自环"}")
 
         val reloginSuccess = runBlocking(Dispatchers.IO) {
             try {
@@ -92,19 +111,38 @@ class PhysicsLabRetryInterceptor : Interceptor {
 
         if (!reloginSuccess) {
             Log.w(TAG, "自动重登录未成功，保留原始响应交由上层提示")
-            return rebuild(response, body, contentType)
+            return fallback(first, redirectLoop)
         }
 
-        val retried = runCatching { chain.proceed(request) }.getOrNull()
-            ?: return rebuild(response, body, contentType)
+        val retried = try {
+            val response = chain.proceed(request)
+            ConsumedResponse(response, response.body.string(), response.body.contentType())
+        } catch (e: IOException) {
+            Log.w(TAG, "重登后重试请求失败，保留原始响应交由上层提示：${e.message}")
+            null
+        } ?: return fallback(first, redirectLoop)
 
-        val retriedBody = retried.body.string()
-        if (classify(retried, retriedBody) != null) {
+        if (classify(retried.response, retried.body) != null) {
             Log.w(TAG, "重试后仍是登录页，保留原始响应")
-            return rebuild(response, body, contentType)
+            return fallback(first, redirectLoop)
         }
-        return rebuild(retried, retriedBody, retried.body.contentType())
+        return rebuild(retried.response, retried.body, retried.contentType)
     }
+
+    /**
+     * 兜底返回：手里有原始响应就原样交回（保持既有语义 —— 不抛异常，由上层提示用户）；
+     * 首次请求就是被重定向自环中断、手里没有任何响应时，只能把原始异常抛出去。
+     */
+    private fun fallback(first: ConsumedResponse?, redirectLoop: ProtocolException?): Response =
+        first?.let { rebuild(it.response, it.body, it.contentType) }
+            ?: throw requireNotNull(redirectLoop)
+
+    /** 响应体已被读取（OkHttp 的 body 只能读一次），连同 contentType 一起带着走。 */
+    private class ConsumedResponse(
+        val response: Response,
+        val body: String,
+        val contentType: MediaType?,
+    )
 
     private fun isReloginFresh(): Boolean =
         System.currentTimeMillis() - lastReloginAt < RELOGIN_COOLDOWN_MS
@@ -149,14 +187,13 @@ class PhysicsLabRetryInterceptor : Interceptor {
         return when {
             landingUrl.contains(MARK_VPN_LOGIN) -> SessionLoss.VPN
             landingUrl.contains(MARK_PLATFORM_LOGIN) -> SessionLoss.PLATFORM
-            isPlatformLoginPage(body) -> SessionLoss.PLATFORM
+            // 网关自己的错误页：会话失效或被拒时返回它（判定方式见 PhysicsLabConfig）
+            PhysicsLabConfig.isGatewayErrorPage(body) -> SessionLoss.VPN
+            PhysicsLabConfig.isPlatformLoginPage(body) -> SessionLoss.PLATFORM
             else -> null
         }
     }
 
-    /** 平台自己的登录页（登录框 id 是固定的）。 */
-    private fun isPlatformLoginPage(body: String): Boolean =
-        body.contains("id=\"txtUserName\"") || body.contains("id=\"frmUser\"")
 
     /** 响应体已被读取，重建后再交回调用方。 */
     private fun rebuild(response: Response, body: String, contentType: MediaType?): Response =

@@ -44,6 +44,9 @@ class PhysicsLabRepository private constructor() {
         /** 分页控件名，课表页与成绩页都是 `pager1`。 */
         private const val PAGER_TARGET = "pager1"
 
+        /** 网关登录页的落地特征：被弹到这里说明网关会话已经没了。 */
+        private const val VPN_LOGIN_MARK = "/enclient"
+
         /** 分页文本：`每页<font>15</font>条记录,共<font>2</font>页,…` */
         private val TOTAL_PAGES_REGEX = Regex("""共\s*<font[^>]*>\s*(\d+)\s*</font>\s*页""")
 
@@ -77,6 +80,8 @@ class PhysicsLabRepository private constructor() {
     /** 实验目录（全部项目）+ 我已选的实验，一次请求拿到。 */
     suspend fun getIndex(): PhysicsLabIndex = withContext(Dispatchers.IO) {
         val html = fetch { api.index() }
+        // 目录在首页内嵌的 JS 数组里；标记不在，说明拿到的根本不是首页（例如网关页面）
+        requireMarker(html, "var tree1Data", "实验目录页")
         PhysicsLabIndex(
             catalog = parseTreeNodes(html, "tree1Data"),
             selected = parseTreeNodes(html, "tree2Data"),
@@ -85,7 +90,7 @@ class PhysicsLabRepository private constructor() {
 
     /** 我的实验课表（含翻页）。 */
     suspend fun getMyExperiments(): List<PhysicsLabTask> = withContext(Dispatchers.IO) {
-        fetchAllTableRows {
+        fetchAllTableRows("实验课表页") {
             api.myAllTaskList(
                 generalCourseId = PhysicsLabConfig.GENERAL_COURSE_ID,
                 generalCourseName = PhysicsLabConfig.GENERAL_COURSE_NAME,
@@ -106,7 +111,7 @@ class PhysicsLabRepository private constructor() {
 
     /** 我的成绩（含翻页）。 */
     suspend fun getScores(): List<PhysicsLabScore> = withContext(Dispatchers.IO) {
-        fetchAllTableRows { api.myScores() }.map { row ->
+        fetchAllTableRows("成绩页") { api.myScores() }.map { row ->
             PhysicsLabScore(
                 courseCode = row["课程代码"].orEmpty(),
                 courseName = row["课程名称"].orEmpty(),
@@ -127,22 +132,57 @@ class PhysicsLabRepository private constructor() {
      * 统一的响应处理。
      *
      * 会话失效理论上已经被拦截器兜住（自动重登 + 重试一次）；
-     * 走到这里还是登录页，说明自动重登也失败了，交给上层提示用户。
+     * 走到这里还不对，说明自动重登也失败了，交给上层提示用户。
      */
     private suspend fun fetch(block: suspend () -> Response<String>): String = checkedHtml(block())
 
+    /**
+     * 响应兜底校验。
+     *
+     * 顺序有意为之：**先判"这不是我们要的页面"，再按 HTTP 码兜底**。网关错误页实测就是
+     * `HTTP 500`，若先按状态码判，它会被当成普通网络错误，上层就丢掉"会话失效"这个语义了。
+     *
+     * 判据覆盖会话失效的三种确定形态：落地 `/enclient`（网关登录页）、网关错误页、平台登录页。
+     */
     private fun checkedHtml(response: Response<String>): String {
+        val html = response.body().orEmpty()
+        val landingUrl = response.raw().request.url.toString()
+        if (landingUrl.contains(VPN_LOGIN_MARK)) {
+            throw PhysicsLabError.VpnLoginFailed("物理实验网关会话已失效，请重新登录")
+        }
+        if (PhysicsLabConfig.isGatewayErrorPage(html)) {
+            throw PhysicsLabError.VpnLoginFailed("物理实验网关拒绝了本次请求，请重新登录")
+        }
+        if (PhysicsLabConfig.isPlatformLoginPage(html)) {
+            throw PhysicsLabError.NeedManualLogin("物理实验平台会话已失效，请重新登录")
+        }
         if (!response.isSuccessful) {
             throw PhysicsLabError.NetworkError("物理实验平台请求失败（HTTP ${response.code()}）")
         }
-        val html = response.body().orEmpty()
         if (html.isBlank()) {
             throw PhysicsLabError.NetworkError("物理实验平台响应为空")
         }
-        if (isLoginPage(html)) {
-            throw PhysicsLabError.NeedManualLogin("物理实验平台会话已失效，请重新登录")
-        }
         return html
+    }
+
+    /**
+     * 校验页面上确实有预期的标记。
+     *
+     * 解析函数对"结构不存在"和"结构在但没有数据"都给空结果，而会话失效时页面上没有预期标记，
+     * 于是会被上层读成"这个学生没有数据"。这里把两者明确分开：标记缺失视为会话问题，
+     * 标记在但 0 条则是合法的空结果（学生确实还没选实验 / 还没出分）。
+     */
+    private fun requireMarker(html: String, marker: String, pageName: String) {
+        if (!html.contains(marker)) {
+            throw PhysicsLabError.VpnLoginFailed("物理实验平台返回的页面不是$pageName，可能是会话已失效")
+        }
+    }
+
+    /** 表格页的同一道校验，按真实结构判断（`table#gvList` 存不存在）。 */
+    private fun requireTablePage(html: String, pageName: String) {
+        if (Jsoup.parse(html).selectFirst("table#$TABLE_ID") == null) {
+            throw PhysicsLabError.VpnLoginFailed("物理实验平台返回的页面不是$pageName，可能是会话已失效")
+        }
     }
 
     /**
@@ -150,12 +190,18 @@ class PhysicsLabRepository private constructor() {
      *
      * 课表页 20 条/页、成绩页 15 条/页，不翻页会**静默少数据**，所以必须取全。
      * 回发用的是上一页 HTML 里的 `__VIEWSTATE`，因此逐页串行。
+     *
+     * @param pageName 只用于报错文案，说明"本该看到哪一张页面"。
      */
     private suspend fun fetchAllTableRows(
+        pageName: String,
         request: suspend () -> Response<String>
     ): List<Map<String, String>> {
         val first = request()
         var html = checkedHtml(first)
+        // 解析前先确认这确实是目标表格页：表结构缺失时解析函数只会返回空列表，
+        // 那会把会话失效伪装成"这个学生没有数据"。
+        requireTablePage(html, pageName)
         val pageUrl = first.raw().request.url.toString()
         val rows = parseTable(html).toMutableList()
 
@@ -178,6 +224,9 @@ class PhysicsLabRepository private constructor() {
                 viewState = VIEWSTATE_REGEX.find(html)?.groupValues?.get(1).orEmpty()
             )
             html = checkedHtml(posted)
+            // 回发被弹回别的页面（会话失效 / 平台改版）时同样要拦下来，
+            // 否则这一页会贡献 0 行，最后拼出一份"看起来正常但缺数据"的结果。
+            requireTablePage(html, pageName)
             val pageRows = parseTable(html)
             Log.d(TAG, "分页：第 $page/$totalPages 页 ${pageRows.size} 行")
             rows += pageRows
@@ -185,9 +234,6 @@ class PhysicsLabRepository private constructor() {
         return rows
     }
 
-    /** 平台自己的登录页长这样（登录框 id 是固定的）。 */
-    private fun isLoginPage(html: String): Boolean =
-        html.contains("id=\"txtUserName\"") || html.contains("id=\"frmUser\"")
 
     // ------------------------------------------------------------------
     // 首页内嵌 JS 数据树

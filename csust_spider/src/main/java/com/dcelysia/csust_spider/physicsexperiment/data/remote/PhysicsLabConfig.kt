@@ -73,6 +73,40 @@ object PhysicsLabConfig {
      */
     const val VPN_USER_INFO_URL = "$VPN_ORIGIN/enclient/api/users/info"
 
+    /**
+     * 网关错误页的页面标记。
+     *
+     * 实测：**不带会话 cookie** 直接请求 `/http/<token>/Index.aspx`，网关返回 `HTTP 500`
+     * 加一张错误页，页面里引用 `ban_error.css`、正文含 `class="error_page"`。
+     *
+     * 这类页面既不是平台登录页、也解析不出任何数据。不把它识别成"网关侧失败"的话，
+     * 上层会把"会话失效"读成"这个学生没有数据"，静默给出空目录 / 空课表 / 空成绩。
+     *
+     * ⚠️ 判据刻意用**页面标记**而不是"5xx 就算会话失效"：一次上游 502 不代表用户会话有问题，
+     * 按状态码判会白白清掉用户会话。
+     */
+    const val GATEWAY_ERROR_MARK_CSS = "ban_error.css"
+    const val GATEWAY_ERROR_MARK_CLASS = "error_page"
+
+    /** 正文是不是网关自己的错误页，供拦截器与数据层共用同一套判据。 */
+    fun isGatewayErrorPage(body: String): Boolean =
+        body.contains(GATEWAY_ERROR_MARK_CSS) || body.contains(GATEWAY_ERROR_MARK_CLASS)
+
+    /** 平台登录页的登录框 id（页面固定，实测不变）。 */
+    const val PLATFORM_LOGIN_MARK_USERNAME = "id=\"txtUserName\""
+    const val PLATFORM_LOGIN_MARK_FORM = "id=\"frmUser\""
+
+    /**
+     * 正文是不是物理实验平台自己的登录页。
+     *
+     * 和网关错误页一样，这属于"会话失效"的判据，**拦截器与数据层必须共用同一份实现**：
+     * 拦截器用它决定要不要自动重登，数据层用它决定要不要抛"请重新登录"。
+     * 两边各写一份的话，一旦平台改版只改了其中一处，就会出现
+     * "拦截器认为会话正常、数据层认为要重登"（或反过来）的错位。
+     */
+    fun isPlatformLoginPage(body: String): Boolean =
+        body.contains(PLATFORM_LOGIN_MARK_USERNAME) || body.contains(PLATFORM_LOGIN_MARK_FORM)
+
     /** 大学物理实验在本平台里的课程 ID（取自首页内嵌的 tree1Data）。 */
     const val GENERAL_COURSE_ID = "2"
 

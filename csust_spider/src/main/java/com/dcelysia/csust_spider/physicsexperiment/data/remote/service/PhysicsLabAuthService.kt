@@ -9,6 +9,7 @@ import com.dcelysia.csust_spider.mooc.data.remote.api.SSOAuthApi
 import com.dcelysia.csust_spider.physicsexperiment.data.remote.PhysicsLabConfig
 import com.dcelysia.csust_spider.physicsexperiment.data.remote.api.PhysicsLabApi
 import com.dcelysia.csust_spider.physicsexperiment.data.remote.error.PhysicsLabError
+import kotlinx.coroutines.CancellationException
 import okhttp3.Cookie
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Response as OkHttpResponse
@@ -72,11 +73,36 @@ object PhysicsLabAuthService {
     /**
      * 确保网关会话可用。
      *
-     * 注意这里**只清网关域的 cookie**：统一认证的 `CASTGC` / `TGT` 必须保留，
+     * ## 为什么先探测、再决定清不清
+     *
+     * 旧实现在这里**无条件**清网关 cookie，等于"还没换来新会话就先把旧的扔掉"：
+     * 一旦后续登录因为网络抖动、验证码或 CAS 5xx 失败，用户会从"可能还能用"
+     * 直接掉到"必须重新绑定学号"，而且不可恢复。所以改成：
+     *
+     * - 会话确实还活着 → 什么都不做直接返回；
+     * - **确定**已失效 → 清掉再重登；
+     * - 状态未知（探针自己失败）→ 保留现状继续往下走，
+     *   后面本来就有 SSO 与账号密码两条路径兜底。
+     *
+     * 清的时候**只清网关域的 cookie**：统一认证的 `CASTGC` / `TGT` 必须保留，
      * 否则每次都要重新提交账号密码，也会把用户其它系统的登录态踢掉。
      */
     private suspend fun ensureVpnSession(account: String, authPassword: String) {
-        RetrofitUtils.clearPhysicsLabSession()
+        when (probeVpnSession()) {
+            VpnSessionState.ALIVE -> {
+                Log.d(TAG, "网关会话仍然有效，跳过重新登录")
+                return
+            }
+
+            VpnSessionState.EXPIRED -> {
+                Log.d(TAG, "网关会话已失效，清理旧 cookie 后重新登录")
+                RetrofitUtils.clearPhysicsLabSession()
+            }
+
+            VpnSessionState.UNKNOWN -> {
+                Log.d(TAG, "网关会话状态未知（探针失败），保留现有 cookie 继续尝试登录")
+            }
+        }
 
         val entryResponse = ssoApi.getLoginForm(service = PhysicsLabConfig.VPN_CAS_CALLBACK)
         val entryHtml = entryResponse.body().orEmpty()
@@ -272,11 +298,58 @@ object PhysicsLabAuthService {
      * 用网关的用户信息接口判断：返回 JSON 且 code=200 才算有效。
      * 这是整个登录流程的**唯一成功判据** —— 比"有没有拿到某个字符串"可靠。
      */
-    suspend fun isVpnSessionAlive(): Boolean {
-        return runCatching {
-            val response = platformApi.vpnUserInfo(PhysicsLabConfig.VPN_USER_INFO_URL)
+    suspend fun isVpnSessionAlive(): Boolean = probeVpnSession() == VpnSessionState.ALIVE
+
+    /**
+     * 网关会话的三种状态。
+     *
+     * 之所以要把"确定失效"和"不知道"分开：清会话是**不可逆**动作，
+     * 只应在确定失效时做（见 [ensureVpnSession]）。
+     */
+    private enum class VpnSessionState { ALIVE, EXPIRED, UNKNOWN }
+
+    /**
+     * 探测网关会话。
+     *
+     * - HTTP 成功且命中"有效"标记（`code=200`）→ [VpnSessionState.ALIVE]；
+     * - HTTP 成功且命中**过期标记**（`code=3010` / "会话已过期"，实测过期返回
+     *   `200` + `{"code":"3010",…,"会话已过期"}`）→ [VpnSessionState.EXPIRED]；
+     * - 401 / 403 → 网关明确拒绝，同样算过期；
+     * - 其它 2xx（正文认不出来）、其它非 2xx（例如上游 5xx）、请求抛异常 →
+     *   **状态未知**，绝不能当成失效去清用户会话。
+     *
+     * ⚠️ 判据刻意"只认正向信号"：要判过期，必须命中明确的过期标记。
+     * 反过来写（2xx 里只要不是"有效"就判过期）会在网关调整 JSON 拼写时
+     * 把一个**还活着的会话**判死，而清会话是不可逆的 —— 宁可当未知多走一次登录。
+     */
+    private suspend fun probeVpnSession(): VpnSessionState {
+        val response = try {
+            platformApi.vpnUserInfo(PhysicsLabConfig.VPN_USER_INFO_URL)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.d(TAG, "网关会话探针请求异常，按状态未知处理：${e.message}")
+            return VpnSessionState.UNKNOWN
+        }
+
+        if (response.isSuccessful) {
             val body = response.body().orEmpty()
-            response.isSuccessful && body.contains("\"code\":\"200\"")
-        }.getOrDefault(false)
+            return when {
+                body.contains("\"code\":\"200\"") -> VpnSessionState.ALIVE
+                body.contains("\"code\":\"3010\"") || body.contains("会话已过期") ->
+                    VpnSessionState.EXPIRED
+                else -> {
+                    Log.d(TAG, "网关会话探针返回 2xx 但正文无法识别，按状态未知处理（不清会话）")
+                    VpnSessionState.UNKNOWN
+                }
+            }
+        }
+        return when (response.code()) {
+            401, 403 -> VpnSessionState.EXPIRED
+            else -> {
+                Log.d(TAG, "网关会话探针返回 HTTP ${response.code()}，按状态未知处理")
+                VpnSessionState.UNKNOWN
+            }
+        }
     }
 }
