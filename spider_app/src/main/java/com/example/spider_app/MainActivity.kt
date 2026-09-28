@@ -10,10 +10,13 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import com.dcelysia.csust_spider.core.Resource
 import com.dcelysia.csust_spider.core.RetrofitUtils
+import com.dcelysia.csust_spider.education.data.remote.EducationData
 import com.dcelysia.csust_spider.education.data.remote.EducationHelper
 import com.dcelysia.csust_spider.education.data.remote.services.AuthService
 import com.dcelysia.csust_spider.education.data.remote.services.ExamArrangeService
 import com.dcelysia.csust_spider.mooc.data.remote.repository.MoocRepository
+import com.dcelysia.csust_spider.physicsexperiment.PhysicsLabHelper
+import com.dcelysia.csust_spider.physicsexperiment.data.remote.error.PhysicsLabError
 import com.example.csustdataget.CampusCard.CampusCardHelper
 import com.example.spider_app.databinding.ActivityMainBinding
 import kotlinx.coroutines.CoroutineScope
@@ -78,6 +81,78 @@ class MainActivity : AppCompatActivity() {
                 Log.d(TAG,"grades:${rl}")
             }
         }
+        // 物理实验：一个按钮走完整流程（登录 → 目录/已选 → 课表 → 成绩）
+        binding.physicsLabButton.setOnClickListener {
+            val username = binding.usernameInput.text.toString().trim()
+            val authPassword = binding.passwordInput.text.toString()
+            // 平台密码留空时**不要覆盖**已保存的那个：实测平台密码与统一认证密码常常不同，
+            // 一旦被覆盖，平台会话过期后的自动续期就会一直用错密码（评审指出）。
+            // 只有用户明确填了新密码、或本地还没存过（首次使用）时才落盘。
+            val typedPlatformPassword = binding.physicsPlatformPasswordInput.text.toString()
+
+            if (username.isBlank() || authPassword.isBlank()) {
+                Toast.makeText(this, R.string.login_input_required, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            CoroutineScope(Dispatchers.IO).launch {
+                // 正式 App 里这两项由"绑定学号"流程写入，demo 里手工塞一下
+                EducationData.studentId = username
+                EducationData.studentPassword = authPassword
+                if (typedPlatformPassword.isNotBlank() || !PhysicsLabHelper.hasPlatformPassword) {
+                    // 明确填了就用填的；没填过才回退用统一认证密码（否则 demo 没法一键跑通）
+                    PhysicsLabHelper.setPlatformPassword(typedPlatformPassword.ifBlank { authPassword })
+                }
+
+                try {
+                    PhysicsLabHelper.clearSession()   // 从干净状态开始，方便反复测试
+                    PhysicsLabHelper.login()
+                    Log.d(TAG, "【物理实验】登录成功，网关会话有效=${PhysicsLabHelper.isLoggedIn()}")
+
+                    val index = PhysicsLabHelper.getIndex()
+                    Log.d(TAG, "【物理实验】实验目录 ${index.catalog.size} 项，已选 ${index.selected.size} 项")
+                    index.selected.forEach { Log.d(TAG, "  已选 [${it.courseId}] ${it.name} (${it.campus})") }
+
+                    val tasks = PhysicsLabHelper.getMyExperiments()
+                    Log.d(TAG, "【物理实验】课表 ${tasks.size} 条:")
+                    tasks.forEach {
+                        Log.d(
+                            TAG,
+                            "  [${it.courseId}] ${it.courseName} | 批次${it.batch} | ${it.teacher} | " +
+                                "${it.location} | ${it.time} | ${it.hours}课时 | ${it.weekday}"
+                        )
+                    }
+
+                    val scores = PhysicsLabHelper.getScores()
+                    Log.d(TAG, "【物理实验】成绩 ${scores.size} 条:")
+                    scores.forEach {
+                        Log.d(
+                            TAG,
+                            "  [${it.courseCode}] ${it.courseName} | ${it.projectName} | " +
+                                "预习${it.previewScore} 操作${it.operationScore} 报告${it.reportScore} 总${it.totalScore}"
+                        )
+                    }
+
+                    withContext(Dispatchers.Main) {
+                        binding.tvDl.text = "物理实验全流程：\n" +
+                            "目录 ${index.catalog.size} 项 / 已选 ${index.selected.size} 项\n" +
+                            "课表 ${tasks.size} 条\n" +
+                            "成绩 ${scores.size} 条"
+                    }
+                } catch (e: PhysicsLabError) {
+                    Log.e(TAG, "【物理实验】失败：${e::class.simpleName} - ${e.message}")
+                    withContext(Dispatchers.Main) {
+                        binding.tvDl.text = "物理实验：${e::class.simpleName}\n${e.message}"
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "【物理实验】异常", e)
+                    withContext(Dispatchers.Main) {
+                        binding.tvDl.text = "物理实验异常：${e.message}"
+                    }
+                }
+            }
+        }
+
         binding.dianliang.setOnClickListener {
             CoroutineScope(Dispatchers.IO).launch {
                 val dianliang = CampusCardHelper.queryElectricity("云塘校区","至诚轩五栋A区","a211")
