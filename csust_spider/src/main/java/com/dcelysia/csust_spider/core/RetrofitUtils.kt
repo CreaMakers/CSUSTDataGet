@@ -6,6 +6,7 @@ import com.dcelysia.csust_spider.core.RetrofitUtils.totalCookieJar
 import com.dcelysia.csust_spider.mooc.cookie.PersistentCookieJar
 import com.dcelysia.csust_spider.physicsexperiment.data.remote.PhysicsLabConfig
 import com.tencent.mmkv.MMKV
+import okhttp3.Dns
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -61,11 +62,22 @@ object RetrofitUtils {
     }
 
 
+    @Volatile
+    private var physicsLabDns: Dns? = null
+
+    fun setPhysicsLabDns(dns: Dns?) {
+        physicsLabDns = dns
+    }
+
+    private fun OkHttpClient.Builder.applyPhysicsLabDns(): OkHttpClient.Builder =
+        apply { physicsLabDns?.let { dns(it) } }
+
     val PhysicsLabClientForAuth: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
+            .applyPhysicsLabDns()
             .addInterceptor(NetworkLogger.getLoggingInterceptor())
             .cookieJar(totalCookieJar)
             .build()
@@ -76,6 +88,7 @@ object RetrofitUtils {
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
+            .applyPhysicsLabDns()
             .addInterceptor(PhysicsLabRetryInterceptor())
             .addInterceptor(NetworkLogger.getLoggingInterceptor())
             .cookieJar(totalCookieJar)

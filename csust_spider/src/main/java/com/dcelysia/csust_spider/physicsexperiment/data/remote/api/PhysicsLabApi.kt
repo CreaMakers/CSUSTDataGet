@@ -55,6 +55,18 @@ interface PhysicsLabApi {
     suspend fun myScores(): Response<String>
 
     /**
+     * "项目选择"页（iframe 子页）：本学期开设的项目 + 配额提示。
+     *
+     * 结构与课表/成绩不同 —— **不是 `table#gvList`**：表头在第一张 `table.grid` 里，
+     * 数据在第二张（实测 4 列、二十余行、无分页）。
+     */
+    @GET("Student/choosecourse.aspx")
+    suspend fun selectableExperiments(
+        @Query("generalCourseId") generalCourseId: String,
+        @Query("generalCourseName") generalCourseName: String
+    ): Response<String>
+
+    /**
      * WebForms 回发翻页：POST 当前页 URL，表单体只带三个字段。
      *
      * 实测课表页（15~20 条/页）与成绩页都没有 `__EVENTVALIDATION`，

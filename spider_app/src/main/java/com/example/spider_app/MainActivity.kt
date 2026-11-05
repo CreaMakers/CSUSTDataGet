@@ -133,11 +133,25 @@ class MainActivity : AppCompatActivity() {
                         )
                     }
 
+                    val selectable = PhysicsLabHelper.getSelectableExperiments()
+                    Log.d(
+                        TAG,
+                        "【物理实验】本学期可选 ${selectable.courses.size} 项，配额=${selectable.quotaText ?: "无"}"
+                    )
+                    selectable.courses.forEach {
+                        Log.d(TAG, "  [${it.courseId}] ${it.name} | ${it.hours}课时 | ${it.action}")
+                    }
+
                     withContext(Dispatchers.Main) {
                         binding.tvDl.text = "物理实验全流程：\n" +
                             "目录 ${index.catalog.size} 项 / 已选 ${index.selected.size} 项\n" +
                             "课表 ${tasks.size} 条\n" +
-                            "成绩 ${scores.size} 条"
+                            "成绩 ${scores.size} 条\n" +
+                            "本学期可选 ${selectable.courses.size} 项\n" +
+                            "配额：${selectable.quotaText ?: "无"}\n" +
+                            selectable.courses.joinToString("\n") {
+                                "${it.courseId} | ${it.name} | ${it.hours} | ${it.action}"
+                            }
                     }
                 } catch (e: PhysicsLabError) {
                     Log.e(TAG, "【物理实验】失败：${e::class.simpleName} - ${e.message}")
@@ -180,7 +194,9 @@ class MainActivity : AppCompatActivity() {
         binding.termDetails.setOnClickListener {
             CoroutineScope(Dispatchers.IO).launch {
                 val details = EducationHelper.getSemesterStartDate("2026-2027-1")
-                binding.tvDl.text = details
+                withContext(Dispatchers.Main) {
+                    binding.tvDl.text = details
+                }
             }
         }
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->

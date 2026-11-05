@@ -7,6 +7,8 @@ import com.dcelysia.csust_spider.physicsexperiment.data.remote.api.PhysicsLabApi
 import com.dcelysia.csust_spider.physicsexperiment.data.remote.dto.PhysicsLabCatalogItem
 import com.dcelysia.csust_spider.physicsexperiment.data.remote.dto.PhysicsLabIndex
 import com.dcelysia.csust_spider.physicsexperiment.data.remote.dto.PhysicsLabScore
+import com.dcelysia.csust_spider.physicsexperiment.data.remote.dto.PhysicsLabSelectable
+import com.dcelysia.csust_spider.physicsexperiment.data.remote.dto.PhysicsLabSelectableItem
 import com.dcelysia.csust_spider.physicsexperiment.data.remote.dto.PhysicsLabTask
 import com.dcelysia.csust_spider.physicsexperiment.data.remote.error.PhysicsLabError
 import kotlinx.coroutines.Dispatchers
@@ -24,6 +26,7 @@ import retrofit2.Response
  * | [getIndex] | `Index.aspx` | 内嵌 JS 数组 `tree1Data`（全部项目）/ `tree2Data`（我已选） |
  * | [getMyExperiments] | `Student/myalltasklist.aspx` | `table#gvList`（8 列） |
  * | [getScores] | `Student/GeneralCourseScore.aspx` | `table#gvList`（7 列） |
+ * | [getSelectableExperiments] | `Student/choosecourse.aspx` | 两张 `table.grid`（表头 + 数据） |
  *
  * ## 会话失效
  *
@@ -46,6 +49,9 @@ class PhysicsLabRepository private constructor() {
 
         /** 网关登录页的落地特征：被弹到这里说明网关会话已经没了。 */
         private const val VPN_LOGIN_MARK = "/enclient"
+
+        /** 项目选择页配额提示行的起始标记。 */
+        private const val QUOTA_MARK = "应选"
 
         /** 分页文本：`每页<font>15</font>条记录,共<font>2</font>页,…` */
         private val TOTAL_PAGES_REGEX = Regex("""共\s*<font[^>]*>\s*(\d+)\s*</font>\s*页""")
@@ -122,6 +128,17 @@ class PhysicsLabRepository private constructor() {
                 totalScore = row["总成绩"].orEmpty(),
             )
         }
+    }
+
+    /** 本学期的"项目选择"页内容：项目列表 + 配额提示。 */
+    suspend fun getSelectableExperiments(): PhysicsLabSelectable = withContext(Dispatchers.IO) {
+        val html = fetch {
+            api.selectableExperiments(
+                generalCourseId = PhysicsLabConfig.GENERAL_COURSE_ID,
+                generalCourseName = PhysicsLabConfig.GENERAL_COURSE_NAME,
+            )
+        }
+        parseSelectable(html)
     }
 
     // ------------------------------------------------------------------
@@ -326,5 +343,57 @@ class PhysicsLabRepository private constructor() {
                 if (header.isEmpty()) null else header to cells.getOrElse(index) { "" }
             }.toMap()
         }
+    }
+
+    /**
+     * 解析"项目选择"页（[getSelectableExperiments]）。
+     *
+     * 这一页的表结构与课表/成绩不同：**表头在第一张 `table.grid` 里、数据在第二张**，
+     * 所以不能走 [parseTable]（那是按 `table#gvList` 写的）。列仍按表头名定位。
+     * 表头认不出来说明页面结构变了 —— 按会话问题抛错，别当成"这个学生没有数据"。
+     */
+    private fun parseSelectable(html: String): PhysicsLabSelectable {
+        val grids = Jsoup.parse(html).select("table.grid")
+        val headers = grids.getOrNull(0)?.selectFirst("tr")
+            ?.select("th, td")?.map { it.text().trim() }.orEmpty()
+        val idIndex = headers.indexOf("项目编号")
+        val nameIndex = headers.indexOf("项目名称")
+        if (grids.size < 2 || idIndex < 0 || nameIndex < 0) {
+            throw PhysicsLabError.VpnLoginFailed("物理实验平台返回的页面不是项目选择页，可能是会话已失效")
+        }
+        val hoursIndex = headers.indexOf("课时")
+        val actionIndex = headers.indexOf("操作")
+
+        // 数据表里没有 th（表头在上一张表），逐行按 td 位置取值；整行皆空则跳过
+        val courses = grids[1].select("tr").mapNotNull { row ->
+            val cells = row.select("td").map { it.text().trim() }
+            val courseId = cells.getOrNull(idIndex).orEmpty()
+            val name = cells.getOrNull(nameIndex).orEmpty()
+            if (courseId.isBlank() && name.isBlank()) return@mapNotNull null
+            PhysicsLabSelectableItem(
+                courseId = courseId,
+                name = name,
+                hours = cells.getOrNull(hoursIndex).orEmpty(),
+                action = cells.getOrNull(actionIndex).orEmpty(),
+            )
+        }
+        return PhysicsLabSelectable(courses, parseQuotaText(html))
+    }
+
+    /**
+     * 配额提示原文（`应选：… 已选：… 还需要选择…`）。
+     *
+     * 取"包含『应选』的最小元素"的整体文本：这句话常被标签切碎，
+     * 而它的祖先元素还会带上表格与表单。页面上没有这句话（例如已完成选课）时返回 null ——
+     * 这类信息缺失不该当成异常。
+     */
+    private fun parseQuotaText(html: String): String? {
+        val node = Jsoup.parse(html).select("div, p, span, td, li")
+            .filter { it.text().contains(QUOTA_MARK) }
+            .minByOrNull { it.text().length } ?: return null
+        val text = node.text().replace('\u00A0', ' ').replace(Regex("\\s+"), " ").trim()
+        val start = text.indexOf(QUOTA_MARK)
+        if (start < 0) return null
+        return text.substring(start).takeIf { it.isNotBlank() }
     }
 }

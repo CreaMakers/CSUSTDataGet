@@ -5,6 +5,7 @@ import com.dcelysia.csust_spider.education.data.remote.EducationData
 import com.dcelysia.csust_spider.physicsexperiment.data.remote.PhysicsLabData
 import com.dcelysia.csust_spider.physicsexperiment.data.remote.dto.PhysicsLabIndex
 import com.dcelysia.csust_spider.physicsexperiment.data.remote.dto.PhysicsLabScore
+import com.dcelysia.csust_spider.physicsexperiment.data.remote.dto.PhysicsLabSelectable
 import com.dcelysia.csust_spider.physicsexperiment.data.remote.dto.PhysicsLabTask
 import com.dcelysia.csust_spider.physicsexperiment.data.remote.error.PhysicsLabError
 import com.dcelysia.csust_spider.physicsexperiment.data.remote.repository.PhysicsLabRepository
@@ -134,4 +135,15 @@ object PhysicsLabHelper {
      * @throws PhysicsLabError 同上
      */
     suspend fun getScores(): List<PhysicsLabScore> = PhysicsLabRepository.instance.getScores()
+
+    /**
+     * 本学期"项目选择"页的内容（本学期开设的项目 + 配额提示）。
+     *
+     * 与 [getIndex] 的"全部项目目录"不是一回事：那一份是历年项目的全量目录，
+     * 这一份才是学生本学期真正面对的项目范围。
+     *
+     * @throws PhysicsLabError 同上
+     */
+    suspend fun getSelectableExperiments(): PhysicsLabSelectable =
+        PhysicsLabRepository.instance.getSelectableExperiments()
 }

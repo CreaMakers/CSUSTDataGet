@@ -123,7 +123,9 @@ class PhysicsLabRetryInterceptor : Interceptor {
         } ?: return fallback(first, redirectLoop)
 
         if (classify(retried.response, retried.body) != null) {
-            Log.w(TAG, "重试后仍是登录页，保留原始响应")
+            // 重登成功但会话没建起来，清掉时间戳，避免后续请求一直跳过重登
+            lastReloginAt = 0L
+            Log.w(TAG, "重试后仍是登录页，本次重登无效，已清除冷却时间戳")
             return fallback(first, redirectLoop)
         }
         return rebuild(retried.response, retried.body, retried.contentType)
